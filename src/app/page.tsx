@@ -1,19 +1,21 @@
-export default function Home() {
+import { createClient } from '@/utils/supabase/server' // Import the SERVER client
+
+export default async function Home() {
+  // 1. Initialize the client
+  const supabase = await createClient()
+
+  // 2. Fetch the user safely on the server
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-          Amcap Nxt Base 2026
-        </h1>
-        <p className="mt-6 text-lg leading-8 text-gray-600">
-          Next.js 16 + Tailwind v4 + Supabase
-        </p>
-        <div className="mt-10 flex items-center justify-center gap-x-6">
-          <button className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
-            Get Started
-          </button>
-        </div>
+      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
+        {user ? (
+          <p>Logged in as: {user.email}</p>
+        ) : (
+          <p>You are not logged in.</p>
+        )}
       </div>
     </main>
-  );
+  )
 }
