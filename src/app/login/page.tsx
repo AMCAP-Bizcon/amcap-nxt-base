@@ -1,5 +1,6 @@
 import { login, signup } from '@/app/auth/actions'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export default function LoginPage() {
   return (
@@ -9,21 +10,19 @@ export default function LoginPage() {
 
         <label className="flex flex-col gap-2">
           <span className="text-sm font-medium text-gray-700">Email</span>
-          <input
+          <Input
             name="email"
             type="email"
             required
-            className="rounded-md border border-gray-300 p-2 focus:border-indigo-500 focus:outline-none"
           />
         </label>
 
         <label className="flex flex-col gap-2">
           <span className="text-sm font-medium text-gray-700">Password</span>
-          <input
+          <Input
             name="password"
             type="password"
             required
-            className="rounded-md border border-gray-300 p-2 focus:border-indigo-500 focus:outline-none"
             minLength={6}
           />
         </label>

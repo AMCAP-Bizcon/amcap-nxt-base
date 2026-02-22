@@ -5,6 +5,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createTodo } from './actions'
 import { Button } from '@/components/ui/button'
 
+import { Input } from '@/components/ui/input'
+
 export default async function DashboardPage() {
     // 1. Get the current user
     const supabase = await createClient()
@@ -23,12 +25,11 @@ export default async function DashboardPage() {
 
             {/* The Form to Add Data */}
             <form action={createTodo} className="flex gap-4 mb-8">
-                <input
+                <Input
                     type="text"
                     name="todoText"
                     required
                     placeholder="What needs to be done?"
-                    className="flex-1 rounded-md border border-gray-300 p-2"
                 />
                 <Button type="submit">
                     Add Todo
