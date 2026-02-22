@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-// We use 'Geist' or 'Inter' as the standard font for 2026
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Navbar from "@/components/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,11 +17,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      {/* antialiased: Makes fonts look thinner/sharper
-        h-full: Ensures the app takes up full height
-      */}
-      <body className={`${inter.className} antialiased h-full`}>
-        {children}
+      <body className={`${inter.className} antialiased h-full flex flex-col min-h-screen bg-gray-50`}>
+        <Navbar />
+        <main className="flex-1">
+          {children}
+        </main>
       </body>
     </html>
   );
