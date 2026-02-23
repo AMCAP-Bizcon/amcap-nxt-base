@@ -4,12 +4,12 @@ import { Input } from '@/components/ui/input'
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
-      <form className="flex w-full max-w-md flex-col gap-4 rounded-lg bg-white p-8 shadow-md">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      <form className="flex w-full max-w-md flex-col gap-4 rounded-lg bg-card text-card-foreground p-8 shadow-md border border-border">
+        <h1 className="text-2xl font-bold">Welcome Back</h1>
 
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-gray-700">Email</span>
+          <span className="text-sm font-medium text-muted-foreground">Email</span>
           <Input
             name="email"
             type="email"
@@ -18,7 +18,7 @@ export default function LoginPage() {
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-gray-700">Password</span>
+          <span className="text-sm font-medium text-muted-foreground">Password</span>
           <Input
             name="password"
             type="password"

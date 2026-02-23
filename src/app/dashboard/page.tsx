@@ -39,9 +39,9 @@ export default async function DashboardPage() {
             {/* The List to Display Data */}
             <ul className="space-y-3">
                 {userTodos.map((todo) => (
-                    <li key={todo.id} className="p-4 border border-gray-200 rounded-md bg-white shadow-sm flex justify-between">
-                        <span>{todo.text}</span>
-                        <span className="text-xs text-gray-400">
+                    <li key={todo.id} className="p-4 border border-border rounded-md bg-card text-card-foreground shadow-sm flex justify-between items-center transition-colors">
+                        <span className="font-medium">{todo.text}</span>
+                        <span className="text-xs text-muted-foreground">
                             {todo.createdAt.toLocaleDateString()} | {todo.createdAt.toLocaleTimeString()}
                         </span>
                     </li>
@@ -49,7 +49,7 @@ export default async function DashboardPage() {
             </ul>
 
             {userTodos.length === 0 && (
-                <p className="text-gray-500 text-center mt-8">No todos yet. Create one above!</p>
+                <p className="text-muted-foreground text-center mt-8">No todos yet. Create one above!</p>
             )}
         </div>
     )
