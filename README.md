@@ -1,36 +1,145 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 2026 SaaS Boilerplate (Next.js 16 + Supabase + Drizzle)
 
-## Getting Started
+A production-ready, infinitely scalable Full-Stack SaaS boilerplate. Built with the "2026 Speed Run" stack to maximize developer velocity while maintaining enterprise-grade reliability and type safety.
 
-First, run the development server:
+## 🛠️ Tech Stack
+
+* **Framework:** [Next.js 16](https://nextjs.org/) (App Router, Turbopack, Server Components)
+* **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) (Oxide engine, CSS-first config)
+* **Auth & Backend:** [Supabase](https://supabase.com/) (PostgreSQL, `@supabase/ssr`)
+* **ORM:** [Drizzle ORM](https://orm.drizzle.team/) (Edge-compatible, type-safe)
+* **UI Components:** [shadcn/ui](https://ui.shadcn.com/) (Owned, customizable components)
+* **Deployment:** [Vercel](https://vercel.com/) (Zero-config CI/CD)
+
+## ✨ Core Features
+
+* **Server-First Architecture:** Leverages React Server Components and Server Actions to eliminate boilerplate API routes and reduce client-side JavaScript.
+* **Modern Auth Flow:** Uses `@supabase/ssr` with cookie-based sessions.
+* **Edge Routing:** Route protection handled via Next.js 16 `proxy.ts` (the high-performance replacement for the deprecated `middleware.ts`).
+* **Connection Pooling:** Configured to safely handle serverless database connections without crashing Postgres.
+* **Ready-to-Use UI:** Includes a global authentication Navbar, login/signup forms, and a protected user dashboard reading/writing to the database.
+
+---
+
+## 🚦 Getting Started
+
+### 1. Prerequisites
+* Node.js (v18+)
+* A [Supabase](https://supabase.com) account
+
+### 2. Clone and Install
+```bash
+git clone https://github.com/YOUR_USERNAME/amcap-nxt-base.git my-new-saas
+cd my-new-saas
+npm install
+```
+
+### 3. Environment Variables
+Create a `.env.local` file in the root directory. You will need 4 variables from your Supabase project dashboard.
+
+**CRITICAL NOTE ON DATABASE URLs:** Serverless functions require connection pooling.
+
+* Use the Transaction Pooler (Port 6543) for your `DATABASE_URL` (used by the Next.js app).
+* Use the Session/Direct connection (Port 5432) for your `DIRECT_URL` (used by Drizzle for migrations).
+
+*Ensure special characters in your database password are URL-encoded (e.g., `#` becomes `%23`, `?` becomes `%3F`).*
+
+```env
+# Supabase API Keys (Settings -> API)
+NEXT_PUBLIC_SUPABASE_URL="https://your-project-ref.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-publishable-anon-key"
+
+# Database Connections (Settings -> Database)
+DATABASE_URL="postgresql://postgres.[ref]:[url-encoded-password]@aws-0-[region].pooler.supabase.com:6543/postgres"
+DIRECT_URL="postgresql://postgres.[ref]:[url-encoded-password]@aws-0-[region].pooler.supabase.com:5432/postgres"
+```
+
+### 4. Database Setup (Drizzle)
+Push the initial schema (which includes the todos table) to your Supabase database:
+
+```bash
+npx drizzle-kit push
+```
+
+### 5. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+*(Note: If you want to use fake emails during local testing, remember to disable "Confirm email" in your Supabase Auth settings).*
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🏗️ Project Structure
 
-## Learn More
+```plaintext
+src/
+├── app/
+│   ├── auth/actions.ts      # Server Actions for login/signup/logout
+│   ├── dashboard/           # Protected route (User specific data)
+│   ├── login/               # Authentication UI
+│   ├── layout.tsx           # Global layout (includes Navbar)
+│   └── page.tsx             # Public landing page
+├── components/
+│   ├── ui/                  # shadcn/ui primitives (Button, Input, etc.)
+│   └── Navbar.tsx           # Global navigation with auth state
+├── db/
+│   ├── index.ts             # Drizzle client & connection pooling
+│   └── schema.ts            # Database tables definition (Postgres)
+├── lib/
+│   └── utils.ts             # Tailwind merge utilities (shadcn)
+├── utils/supabase/
+│   ├── client.ts            # Supabase client for Browser components
+│   └── server.ts            # Supabase client for Server components/actions
+└── proxy.ts                 # Edge proxy (Next.js 16 Bouncer) for route protection
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 🚀 Deployment (Vercel)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Push your code to GitHub.
+2. Import the repository into Vercel.
+3. Add your 4 Environment Variables in the Vercel project settings. (Do not include quotation marks `""` around the URLs in Vercel's UI).
+4. Click **Deploy**.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Post-Deployment Checklist
+Once deployed, you must update your Supabase Auth settings so it knows your live URL:
 
-## Deploy on Vercel
+1. Go to **Supabase Dashboard -> Authentication -> URL Configuration**.
+2. Update the **Site URL** to your Vercel domain (e.g., `https://my-saas.vercel.app`).
+3. Add the Vercel domain to your **Redirect URLs** (e.g., `https://my-saas.vercel.app/**`).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 💡 Adding New Components
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+To add new UI components via shadcn/ui, simply run:
+
+```bash
+npx shadcn@latest add [component-name]
+```
+
+Example: `npx shadcn@latest add card dialog toast`
+
+## 🗄️ Database Migrations
+
+When you update `src/db/schema.ts` with new tables or columns, sync it to your database by running:
+
+```bash
+npx drizzle-kit push
+```
+
+## 🏆 Credits & Acknowledgments
+
+This boilerplate was architected and built by:
+* **Aniruddh Sisodia** - [Amcap Business Consulting Private Limited](https://amcapbizcon.com)
+* **Antigravity (Google Gemini)** - AI Pair Programmer & Architectural Co-Pilot
+* **The Next.js Team & Vercel** - For creating the incredible underlying framework.
+
+Amcap Business Consulting Private Limited actively maintains this boilerplate to continuously build, improve, and deploy modern, monetizable web applications.
+
+## 📄 License & Copyright
+
+**Copyright (c) 2026 Aniruddh Sisodia / Amcap Business Consulting Private Limited**
+
+This project is open-source and released under the [MIT License](LICENSE). 
+
+You are completely free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software, and to use it to build your own monetized web applications. The only requirement is that you must include the above copyright notice and this permission notice in all copies or substantial portions of the Software.
