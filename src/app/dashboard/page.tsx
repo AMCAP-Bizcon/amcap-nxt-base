@@ -2,10 +2,10 @@ import { db } from '@/db'
 import { todos } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
-import { createTodo } from './actions'
+import { createTodo, deleteTodo } from './actions'
 import { Button } from '@/components/ui/button'
-
 import { Input } from '@/components/ui/input'
+import { Trash2 } from 'lucide-react'
 
 export default async function DashboardPage() {
     // 1. Get the current user
@@ -40,10 +40,18 @@ export default async function DashboardPage() {
             <ul className="space-y-3">
                 {userTodos.map((todo) => (
                     <li key={todo.id} className="p-4 border border-border rounded-md bg-card text-card-foreground shadow-sm flex justify-between items-center transition-colors">
-                        <span className="font-medium">{todo.text}</span>
-                        <span className="text-xs text-muted-foreground">
-                            {todo.createdAt.toLocaleDateString()} | {todo.createdAt.toLocaleTimeString()}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                            <span className="font-medium">{todo.text}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {todo.createdAt.toLocaleDateString()} | {todo.createdAt.toLocaleTimeString()}
+                            </span>
+                        </div>
+                        <form action={deleteTodo.bind(null, todo.id)}>
+                            <Button variant="ghost" size="icon" type="submit" title="Delete Todo" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Delete</span>
+                            </Button>
+                        </form>
                     </li>
                 ))}
             </ul>
