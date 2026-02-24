@@ -51,7 +51,7 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
             style={style}
             {...(isReordering ? attributes : {})}
             {...(isReordering ? listeners : {})}
-            className={`p-4 border border-border rounded-md bg-card text-card-foreground shadow-sm flex gap-3 items-center transition-colors ${isReordering ? 'cursor-grab active:cursor-grabbing hover:border-primary/50' : ''} ${isEditing ? 'hover:border-primary/50' : ''}`}
+            className={`p-4 border border-border rounded-md bg-card text-card-foreground shadow-sm flex gap-3 items-center transition-colors ${isReordering ? 'touch-none cursor-grab active:cursor-grabbing hover:border-primary/50' : ''} ${isEditing ? 'hover:border-primary/50' : ''}`}
         >
             {isSelectable && (
                 <input
@@ -98,7 +98,11 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     }, [initialTodos, mode])
 
     const sensors = useSensors(
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5,
+            },
+        }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         })
