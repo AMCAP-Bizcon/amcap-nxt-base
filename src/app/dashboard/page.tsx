@@ -3,8 +3,6 @@ import { todos } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
 import { createTodo } from './actions'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { TodoList } from './TodoList'
 
 export default async function DashboardPage() {
@@ -24,19 +22,6 @@ export default async function DashboardPage() {
     return (
         <div className="mx-auto max-w-2xl p-8">
             <h1 className="text-3xl font-bold mb-8">Your Dashboard</h1>
-
-            {/* The Form to Add Data */}
-            <form action={createTodo} className="flex gap-4 mb-8">
-                <Input
-                    type="text"
-                    name="todoText"
-                    required
-                    placeholder="What needs to be done?"
-                />
-                <Button type="submit">
-                    Add Todo
-                </Button>
-            </form>
 
             <TodoList initialTodos={userTodos} />
         </div>

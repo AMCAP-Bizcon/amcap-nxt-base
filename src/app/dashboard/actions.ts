@@ -4,26 +4,23 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { todos } from '@/db/schema'
 import { createClient } from '@/utils/supabase/server'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 
 /**
  * Creates a new Todo item for the currently authenticated user.
  * It strictly requires a valid session to perform database mutations.
  * 
- * @param {FormData} formData - The submitted form data containing 'todoText'
+ * @param {string} text - The text of the new Todo item
  * @throws {Error} If the user is unauthenticated
  */
-export async function createTodo(formData: FormData) {
+export async function createTodo(text: string) {
     // 1. Verify who is making the request
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) throw new Error("Unauthorized")
 
-    // 2. Extract the text from the form
-    const text = formData.get('todoText') as string
-
-    // 3. Insert into the database via Drizzle
+    // 2. Insert into the database via Drizzle
     await db.insert(todos).values({
         text: text,
         userId: user.id,
@@ -108,12 +105,12 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
 }
 
 /**
- * Marks multiple Todo items as done.
+ * Toggles the done status of multiple Todo items.
  * 
- * @param {Array<number>} ids - The IDs of the Todo items to mark as done
+ * @param {Array<number>} ids - The IDs of the Todo items to toggle
  * @throws {Error} If the user is unauthenticated
  */
-export async function markTodosAsDone(ids: number[]) {
+export async function toggleTodosDoneStatus(ids: number[]) {
     // 1. Verify who is making the request
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -125,7 +122,7 @@ export async function markTodosAsDone(ids: number[]) {
     // 2. Perform bulk update
     await db
         .update(todos)
-        .set({ done: true })
+        .set({ done: sql`NOT ${todos.done}` })
         .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
 
     // 3. Refresh the dashboard page data

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle } from 'lucide-react'
+import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle, PlusCircle } from 'lucide-react'
 import {
     DndContext,
     closestCenter,
@@ -20,7 +20,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { updateTodoSequence, updateTodoTexts, markTodosAsDone, deleteMultipleTodos } from './actions'
+import { updateTodoSequence, updateTodoTexts, toggleTodosDoneStatus, deleteMultipleTodos, createTodo } from './actions'
 
 type Todo = {
     id: number
@@ -84,14 +84,16 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
 
 export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     const [todos, setTodos] = useState(initialTodos)
-    const [mode, setMode] = useState<'idle' | 'reordering' | 'editing' | 'done' | 'delete'>('idle')
+    const [mode, setMode] = useState<'idle' | 'reordering' | 'editing' | 'done' | 'delete' | 'creating'>('idle')
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null)
     const [selectedTodoIds, setSelectedTodoIds] = useState<number[]>([])
     const [isSaving, setIsSaving] = useState(false)
+    const [newTodoText, setNewTodoText] = useState('')
 
     useEffect(() => {
         if (mode === 'idle') {
             setTodos(initialTodos)
+            setNewTodoText('')
         }
     }, [initialTodos, mode])
 
@@ -118,7 +120,12 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     const handleSave = async () => {
         setIsSaving(true)
         try {
-            if (mode === 'reordering') {
+            if (mode === 'creating') {
+                if (newTodoText.trim()) {
+                    await createTodo(newTodoText.trim())
+                    // Refresh is handled by Next.js revalidatePath which updates initialTodos
+                }
+            } else if (mode === 'reordering') {
                 const updates = todos.map((todo, index) => ({
                     id: todo.id,
                     sequence: index,
@@ -139,9 +146,9 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                 }
             } else if (mode === 'done') {
                 if (selectedTodoIds.length > 0) {
-                    await markTodosAsDone(selectedTodoIds)
+                    await toggleTodosDoneStatus(selectedTodoIds)
                     // Optimistic update handled by invalidation or state change
-                    setTodos(todos.map(t => selectedTodoIds.includes(t.id) ? { ...t, done: true } : t))
+                    setTodos(todos.map(t => selectedTodoIds.includes(t.id) ? { ...t, done: !t.done } : t))
                 }
             } else if (mode === 'delete') {
                 if (selectedTodoIds.length > 0) {
@@ -166,6 +173,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         setMode('idle')
         setEditingTodoId(null)
         setSelectedTodoIds([])
+        setNewTodoText('')
     }
 
     const handleSelectToggle = (id: number) => {
@@ -178,23 +186,15 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         setTodos(todos.map(t => t.id === id ? { ...t, text } : t))
     }
 
-    if (todos.length === 0) {
-        return <p className="text-muted-foreground text-center mt-8">No todos yet. Create one above!</p>
-    }
-
     return (
         <div className="w-full">
             {/* The Mini Toolbar */}
             <div className="flex justify-center flex-wrap gap-3 mb-4">
                 {mode === 'idle' ? (
                     <>
-                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
-                            <CheckSquare className="w-4 h-4 mr-1.5" />
-                            Done
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50">
-                            <Trash2 className="w-4 h-4 mr-1.5" />
-                            Delete
+                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="text-violet-600 hover:text-violet-700 hover:bg-violet-50">
+                            <PlusCircle className="w-4 h-4 mr-1.5" />
+                            Create
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                             <Edit2 className="w-4 h-4 mr-1.5" />
@@ -202,7 +202,15 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
                             <MoveVertical className="w-4 h-4 mr-1.5" />
-                            Alter
+                            Move
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                            <CheckSquare className="w-4 h-4 mr-1.5" />
+                            Complete
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50">
+                            <Trash2 className="w-4 h-4 mr-1.5" />
+                            Remove
                         </Button>
                     </>
                 ) : (
@@ -230,6 +238,27 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                     strategy={verticalListSortingStrategy}
                 >
                     <ul className="space-y-3">
+                        {mode === 'creating' && (
+                            <li className="p-4 border border-primary/50 shadow-md rounded-md bg-card text-card-foreground flex gap-3 items-center transition-colors">
+                                <div className="flex flex-col gap-1 w-full relative">
+                                    <input
+                                        type="text"
+                                        value={newTodoText}
+                                        onChange={(e) => setNewTodoText(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleSave()
+                                            if (e.key === 'Escape') handleDiscard()
+                                        }}
+                                        placeholder="What needs to be done?"
+                                        className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 py-1"
+                                        autoFocus
+                                    />
+                                    <span className="text-xs text-muted-foreground mt-1 absolute right-0 top-1/2 -translate-y-1/2">
+                                        Press Enter to save
+                                    </span>
+                                </div>
+                            </li>
+                        )}
                         {todos.map((todo) => (
                             <SortableItem
                                 key={todo.id}
@@ -245,6 +274,11 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                                 onSelectToggle={handleSelectToggle}
                             />
                         ))}
+                        {todos.length === 0 && mode !== 'creating' && (
+                            <p className="text-muted-foreground text-center mt-8 py-8 border-2 border-dashed border-border rounded-lg">
+                                No todos yet. Click "Create" to start!
+                            </p>
+                        )}
                     </ul>
                 </SortableContext>
             </DndContext>
