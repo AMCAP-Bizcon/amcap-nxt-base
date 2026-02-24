@@ -11,7 +11,7 @@ export default function Footer() {
                         Amcap Business Consulting Private Limited
                     </span>
                     <span className="text-xs text-muted-foreground">
-                        No.804, 772/A, B' Block, 3rd Stage, Vijayanagar
+                        No.804, 772/A, B&apos; Block, 3rd Stage, Vijayanagar
                     </span>
                     <span className="text-xs text-muted-foreground">
                         570017 - Mysore, India

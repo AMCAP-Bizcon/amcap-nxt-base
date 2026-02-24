@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle } from 'lucide-react'
 import {
     DndContext,
     closestCenter,
@@ -19,7 +20,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { updateTodoSequence, updateTodoTexts } from './actions'
+import { updateTodoSequence, updateTodoTexts, markTodosAsDone, deleteMultipleTodos } from './actions'
 
 type Todo = {
     id: number
@@ -30,7 +31,7 @@ type Todo = {
     createdAt: Date
 }
 
-function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, onStartEdit, onTextChange }: { id: number, todo: Todo, isReordering: boolean, isEditing: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onTextChange: (id: number, text: string) => void }) {
+function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, onStartEdit, onTextChange, isSelectable, isSelected, onSelectToggle }: { id: number, todo: Todo, isReordering: boolean, isEditing: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void }) {
     const {
         attributes,
         listeners,
@@ -50,8 +51,16 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
             style={style}
             {...(isReordering ? attributes : {})}
             {...(isReordering ? listeners : {})}
-            className={`p-4 border border-border rounded-md bg-card text-card-foreground shadow-sm flex justify-between items-center transition-colors ${isReordering ? 'cursor-grab active:cursor-grabbing hover:border-primary/50' : ''} ${isEditing ? 'hover:border-primary/50' : ''}`}
+            className={`p-4 border border-border rounded-md bg-card text-card-foreground shadow-sm flex gap-3 items-center transition-colors ${isReordering ? 'cursor-grab active:cursor-grabbing hover:border-primary/50' : ''} ${isEditing ? 'hover:border-primary/50' : ''}`}
         >
+            {isSelectable && (
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onSelectToggle(id)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                />
+            )}
             <div className={`flex flex-col gap-1 w-full ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => { if (isEditing) onStartEdit(id) }}>
                 {isCurrentlyEditing ? (
                     <input
@@ -62,7 +71,7 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
                         autoFocus
                     />
                 ) : (
-                    <span className="font-medium">{todo.text}</span>
+                    <span className={`font-medium ${todo.done ? 'line-through text-muted-foreground' : ''}`}>{todo.text}</span>
                 )}
                 <span className="text-xs text-muted-foreground cursor-default">
                     {new Date(todo.createdAt).toLocaleDateString()} | {new Date(todo.createdAt).toLocaleTimeString()}
@@ -75,8 +84,9 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
 
 export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     const [todos, setTodos] = useState(initialTodos)
-    const [mode, setMode] = useState<'idle' | 'reordering' | 'editing'>('idle')
+    const [mode, setMode] = useState<'idle' | 'reordering' | 'editing' | 'done' | 'delete'>('idle')
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null)
+    const [selectedTodoIds, setSelectedTodoIds] = useState<number[]>([])
     const [isSaving, setIsSaving] = useState(false)
 
     useEffect(() => {
@@ -127,9 +137,22 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                 if (updates.length > 0) {
                     await updateTodoTexts(updates)
                 }
+            } else if (mode === 'done') {
+                if (selectedTodoIds.length > 0) {
+                    await markTodosAsDone(selectedTodoIds)
+                    // Optimistic update handled by invalidation or state change
+                    setTodos(todos.map(t => selectedTodoIds.includes(t.id) ? { ...t, done: true } : t))
+                }
+            } else if (mode === 'delete') {
+                if (selectedTodoIds.length > 0) {
+                    await deleteMultipleTodos(selectedTodoIds)
+                    // Optimistic update
+                    setTodos(todos.filter(t => !selectedTodoIds.includes(t.id)))
+                }
             }
             setMode('idle')
             setEditingTodoId(null)
+            setSelectedTodoIds([])
         } catch (error) {
             console.error("Failed to save", error)
             // Ideally add a toast notification here
@@ -142,6 +165,13 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         setTodos(initialTodos)
         setMode('idle')
         setEditingTodoId(null)
+        setSelectedTodoIds([])
+    }
+
+    const handleSelectToggle = (id: number) => {
+        setSelectedTodoIds(prev =>
+            prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]
+        )
     }
 
     const handleTextChange = (id: number, text: string) => {
@@ -155,22 +185,34 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     return (
         <div className="w-full">
             {/* The Mini Toolbar */}
-            <div className="flex justify-end gap-2 mb-4">
+            <div className="flex justify-center flex-wrap gap-3 mb-4">
                 {mode === 'idle' ? (
                     <>
-                        <Button variant="outline" size="sm" onClick={() => setMode('editing')}>
+                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                            <CheckSquare className="w-4 h-4 mr-1.5" />
+                            Done
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50">
+                            <Trash2 className="w-4 h-4 mr-1.5" />
+                            Delete
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                            <Edit2 className="w-4 h-4 mr-1.5" />
                             Edit
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')}>
+                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
+                            <MoveVertical className="w-4 h-4 mr-1.5" />
                             Alter
                         </Button>
                     </>
                 ) : (
                     <>
-                        <Button variant="ghost" size="sm" onClick={handleDiscard} disabled={isSaving}>
+                        <Button variant="ghost" size="sm" onClick={handleDiscard} disabled={isSaving} className="text-muted-foreground hover:bg-muted/50">
+                            <XCircle className="w-4 h-4 mr-1.5" />
                             Discard
                         </Button>
-                        <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving}>
+                        <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving} className="bg-primary hover:bg-primary/90">
+                            <Save className="w-4 h-4 mr-1.5" />
                             {isSaving ? 'Saving...' : 'Save'}
                         </Button>
                     </>
@@ -198,6 +240,9 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                                 isCurrentlyEditing={editingTodoId === todo.id}
                                 onStartEdit={setEditingTodoId}
                                 onTextChange={handleTextChange}
+                                isSelectable={mode === 'done' || mode === 'delete'}
+                                isSelected={selectedTodoIds.includes(todo.id)}
+                                onSelectToggle={handleSelectToggle}
                             />
                         ))}
                     </ul>

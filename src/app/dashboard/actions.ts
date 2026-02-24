@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { todos } from '@/db/schema'
 import { createClient } from '@/utils/supabase/server'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 
 /**
  * Creates a new Todo item for the currently authenticated user.
@@ -102,6 +102,55 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
             .set({ text: item.text })
             .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
     }
+
+    // 3. Refresh the dashboard page data
+    revalidatePath('/dashboard')
+}
+
+/**
+ * Marks multiple Todo items as done.
+ * 
+ * @param {Array<number>} ids - The IDs of the Todo items to mark as done
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function markTodosAsDone(ids: number[]) {
+    // 1. Verify who is making the request
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    if (ids.length === 0) return
+
+    // 2. Perform bulk update
+    await db
+        .update(todos)
+        .set({ done: true })
+        .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+
+    // 3. Refresh the dashboard page data
+    revalidatePath('/dashboard')
+}
+
+/**
+ * Deletes multiple Todo items.
+ * 
+ * @param {Array<number>} ids - The IDs of the Todo items to delete
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function deleteMultipleTodos(ids: number[]) {
+    // 1. Verify who is making the request
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    if (ids.length === 0) return
+
+    // 2. Perform bulk delete
+    await db
+        .delete(todos)
+        .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
 
     // 3. Refresh the dashboard page data
     revalidatePath('/dashboard')
