@@ -55,3 +55,54 @@ export async function deleteTodo(id: number) {
     // 3. Refresh the dashboard page data
     revalidatePath('/dashboard')
 }
+
+/**
+ * Updates the sequence of multiple Todo items.
+ * 
+ * @param {Array<{ id: number, sequence: number }>} items - The items with their new sequences
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateTodoSequence(items: { id: number; sequence: number }[]) {
+    // 1. Verify who is making the request
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    // 2. Perform bulk update (looping is fine for small lists, otherwise consider batching/transactions)
+    // Note: Drizzle currently doesn't have a simple bulk update, so we update one by one
+    for (const item of items) {
+        await db
+            .update(todos)
+            .set({ sequence: item.sequence })
+            .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
+    }
+
+    // 3. Refresh the dashboard page data
+    revalidatePath('/dashboard')
+}
+
+/**
+ * Updates the text content of multiple Todo items.
+ * 
+ * @param {Array<{ id: number, text: string }>} items - The items with their new texts
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateTodoTexts(items: { id: number; text: string }[]) {
+    // 1. Verify who is making the request
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    // 2. Perform bulk update
+    for (const item of items) {
+        await db
+            .update(todos)
+            .set({ text: item.text })
+            .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
+    }
+
+    // 3. Refresh the dashboard page data
+    revalidatePath('/dashboard')
+}

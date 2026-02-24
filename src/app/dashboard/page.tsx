@@ -2,10 +2,10 @@ import { db } from '@/db'
 import { todos } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
-import { createTodo, deleteTodo } from './actions'
+import { createTodo } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Trash2 } from 'lucide-react'
+import { TodoList } from './TodoList'
 
 export default async function DashboardPage() {
     // 1. Get the current user
@@ -14,10 +14,12 @@ export default async function DashboardPage() {
 
     // 2. Fetch ONLY the todos belonging to this user
     // This is the equivalent of: SELECT * FROM todos WHERE user_id = '123'
+    // Order by sequence first, then fallback to createdAt
     const userTodos = await db
         .select()
         .from(todos)
         .where(eq(todos.userId, user!.id))
+        .orderBy(todos.sequence, todos.createdAt)
 
     return (
         <div className="mx-auto max-w-2xl p-8">
@@ -36,29 +38,7 @@ export default async function DashboardPage() {
                 </Button>
             </form>
 
-            {/* The List to Display Data */}
-            <ul className="space-y-3">
-                {userTodos.map((todo) => (
-                    <li key={todo.id} className="p-4 border border-border rounded-md bg-card text-card-foreground shadow-sm flex justify-between items-center transition-colors">
-                        <div className="flex flex-col gap-1">
-                            <span className="font-medium">{todo.text}</span>
-                            <span className="text-xs text-muted-foreground">
-                                {todo.createdAt.toLocaleDateString()} | {todo.createdAt.toLocaleTimeString()}
-                            </span>
-                        </div>
-                        <form action={deleteTodo.bind(null, todo.id)}>
-                            <Button variant="ghost" size="icon" type="submit" title="Delete Todo" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Delete</span>
-                            </Button>
-                        </form>
-                    </li>
-                ))}
-            </ul>
-
-            {userTodos.length === 0 && (
-                <p className="text-muted-foreground text-center mt-8">No todos yet. Create one above!</p>
-            )}
+            <TodoList initialTodos={userTodos} />
         </div>
     )
 }
