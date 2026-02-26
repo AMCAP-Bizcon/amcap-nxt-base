@@ -20,13 +20,23 @@ export async function createTodo(text: string) {
 
     if (!user) throw new Error("Unauthorized")
 
-    // 2. Insert into the database via Drizzle
+    // Find the current minimum sequence for this user's todos
+    const [result] = await db
+        .select({ minSeq: sql<number>`MIN(${todos.sequence})` })
+        .from(todos)
+        .where(eq(todos.userId, user.id))
+
+    // Calculate the new minimum sequence
+    const newSequence = result?.minSeq !== null ? Number(result.minSeq) - 1 : 0
+
+    // 2. Insert into the database via Drizzle at the first position
     await db.insert(todos).values({
         text: text,
         userId: user.id,
+        sequence: newSequence,
     })
 
-    // 4. Tell Next.js to refresh the dashboard page to show the new data
+    // 3. Tell Next.js to refresh the dashboard page to show the new data
     revalidatePath('/dashboard')
 }
 
