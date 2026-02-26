@@ -19,9 +19,6 @@ export default async function Home() {
   return (
     <main className="min-h-[calc(100vh-4rem)] p-6 sm:p-12 md:p-24 bg-gradient-to-br from-background via-background to-muted/30">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl sm:text-3xl font-semibold mb-12 text-foreground/80 tracking-tight">
-          My Apps
-        </h1>
 
         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-x-4 gap-y-10">
           <Link

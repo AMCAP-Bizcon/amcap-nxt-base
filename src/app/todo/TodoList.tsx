@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle, PlusCircle } from 'lucide-react'
 import {
@@ -63,18 +63,29 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
             )}
             <div className={`flex flex-col gap-1 w-full ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => { if (isEditing) onStartEdit(id) }}>
                 {isCurrentlyEditing ? (
-                    <input
-                        type="text"
+                    <textarea
+                        ref={(el) => {
+                            if (el) {
+                                el.style.height = 'auto';
+                                el.style.height = el.scrollHeight + 'px';
+                            }
+                        }}
                         value={todo.text}
                         onChange={(e) => onTextChange(id, e.target.value)}
-                        className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1"
+                        className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 resize-none overflow-hidden"
+                        rows={1}
                         autoFocus
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                            }
+                        }}
                     />
                 ) : (
-                    <span className={`font-medium ${todo.done ? 'line-through text-muted-foreground' : ''}`}>{todo.text}</span>
+                    <span className={`font-medium break-words whitespace-pre-wrap ${todo.done ? 'line-through text-muted-foreground' : ''}`}>{todo.text}</span>
                 )}
-                <span className="text-xs text-muted-foreground cursor-default">
-                    {new Date(todo.createdAt).toLocaleDateString()} | {new Date(todo.createdAt).toLocaleTimeString()}
+                <span className="text-xs text-muted-foreground cursor-default" suppressHydrationWarning>
+                    {new Date(todo.createdAt).toLocaleString('en-GB')}
                 </span>
             </div>
         </li>
@@ -180,6 +191,30 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         setNewTodoText('')
     }
 
+    const latestHandlers = useRef({ handleSave, handleDiscard, mode, isSaving })
+
+    useEffect(() => {
+        latestHandlers.current = { handleSave, handleDiscard, mode, isSaving }
+    })
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const { handleSave, handleDiscard, mode, isSaving } = latestHandlers.current
+            if (mode !== 'idle' && !isSaving) {
+                if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void handleSave()
+                } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    handleDiscard()
+                }
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [])
+
     const handleSelectToggle = (id: number) => {
         setSelectedTodoIds(prev =>
             prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]
@@ -190,46 +225,58 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         setTodos(todos.map(t => t.id === id ? { ...t, text } : t))
     }
 
+    const modeStyles: Record<typeof mode, { gradient: string, shadow: string }> = {
+        idle: { gradient: 'via-slate-400/40', shadow: 'shadow-[0_0_15px_rgba(148,163,184,0.3)]' },
+        creating: { gradient: 'via-violet-500/50', shadow: 'shadow-[0_0_20px_rgba(139,92,246,0.4)]' },
+        editing: { gradient: 'via-blue-500/50', shadow: 'shadow-[0_0_20px_rgba(59,130,246,0.4)]' },
+        reordering: { gradient: 'via-amber-500/50', shadow: 'shadow-[0_0_20px_rgba(245,158,11,0.4)]' },
+        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-[0_0_20px_rgba(16,185,129,0.4)]' },
+        delete: { gradient: 'via-rose-500/50', shadow: 'shadow-[0_0_20px_rgba(244,63,94,0.4)]' }
+    }
+
     return (
         <div className="w-full">
             {/* The Mini Toolbar */}
-            <div className="flex justify-center flex-wrap gap-3 mb-4">
+            <div className={`grid gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2'}`}>
                 {mode === 'idle' ? (
                     <>
-                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-[0_0_15px_rgba(139,92,246,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-[0_0_15px_rgba(139,92,246,0.5)]">
                             <PlusCircle className="w-4 h-4 mr-1.5" />
                             Create
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)]">
                             <Edit2 className="w-4 h-4 mr-1.5" />
                             Edit
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-[0_0_15px_rgba(245,158,11,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="w-full h-11 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-[0_0_15px_rgba(245,158,11,0.5)]">
                             <MoveVertical className="w-4 h-4 mr-1.5" />
                             Move
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]">
                             <CheckSquare className="w-4 h-4 mr-1.5" />
                             Complete
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-[0_0_15px_rgba(244,63,94,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="w-full h-11 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-[0_0_15px_rgba(244,63,94,0.5)]">
                             <Trash2 className="w-4 h-4 mr-1.5" />
                             Remove
                         </Button>
                     </>
                 ) : (
                     <>
-                        <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-[0_0_15px_rgba(100,116,139,0.5)] dark:hover:bg-slate-900/50">
+                        <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="w-full h-11 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-[0_0_15px_rgba(100,116,139,0.5)] dark:hover:bg-slate-900/50">
                             <XCircle className="w-4 h-4 mr-1.5" />
-                            Discard
+                            Discard (Esc)
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] dark:hover:bg-sky-900/50">
+                        <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="w-full h-11 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] dark:hover:bg-sky-900/50">
                             <Save className="w-4 h-4 mr-1.5" />
-                            {isSaving ? 'Saving...' : 'Save'}
+                            {isSaving ? 'Saving...' : 'Save (Enter)'}
                         </Button>
                     </>
                 )}
             </div>
+
+            {/* Glowing Separator */}
+            <div className={`h-[1.5px] w-[150%] relative left-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent ${modeStyles[mode].gradient} to-transparent my-8 blur-[0.5px] ${modeStyles[mode].shadow} transition-all duration-300 ease-out`} aria-hidden="true" />
 
             {/* The List to Display Data */}
             <DndContext
@@ -245,21 +292,25 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                         {mode === 'creating' && (
                             <li className="p-4 border border-primary/50 shadow-md rounded-md bg-card text-card-foreground flex gap-3 items-center transition-colors">
                                 <div className="flex flex-col gap-1 w-full relative">
-                                    <input
-                                        type="text"
+                                    <textarea
+                                        ref={(el) => {
+                                            if (el) {
+                                                el.style.height = 'auto';
+                                                el.style.height = el.scrollHeight + 'px';
+                                            }
+                                        }}
                                         value={newTodoText}
                                         onChange={(e) => setNewTodoText(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleSave()
-                                            if (e.key === 'Escape') handleDiscard()
-                                        }}
                                         placeholder="What needs to be done?"
-                                        className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 py-1"
+                                        className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 py-1 resize-none overflow-hidden"
+                                        rows={1}
                                         autoFocus
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                            }
+                                        }}
                                     />
-                                    <span className="text-xs text-muted-foreground mt-1 absolute right-0 top-1/2 -translate-y-1/2">
-                                        Press Enter to save
-                                    </span>
                                 </div>
                             </li>
                         )}
@@ -280,7 +331,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                         ))}
                         {todos.length === 0 && mode !== 'creating' && (
                             <p className="text-muted-foreground text-center mt-8 py-8 border-2 border-dashed border-border rounded-lg">
-                                No todos yet. Click "Create" to start!
+                                No todos yet. Click &quot;Create&quot; to start!
                             </p>
                         )}
                     </ul>
