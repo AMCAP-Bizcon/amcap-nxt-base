@@ -51,8 +51,8 @@ export default async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // 2. Route Protection (The "Bouncer" Logic)
-  // If user tries to go to /dashboard without a session, bounce them to login
-  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
+  // If user tries to go to /todo without a session, bounce them to login
+  if (request.nextUrl.pathname.startsWith('/todo') && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

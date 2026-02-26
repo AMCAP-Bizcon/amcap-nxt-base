@@ -1,6 +1,7 @@
 import { login, signup } from '@/app/auth/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { LogIn, UserPlus } from 'lucide-react'
 
 export default function LoginPage() {
   return (
@@ -30,9 +31,11 @@ export default function LoginPage() {
         <div className="flex gap-4 mt-4">
           {/* This button triggers the 'login' server action */}
           <Button
+            variant="outline"
             formAction={login}
-            className="flex-1"
+            className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] dark:hover:bg-emerald-900/50"
           >
+            <LogIn className="w-4 h-4 mr-1.5" />
             Log in
           </Button>
 
@@ -40,8 +43,9 @@ export default function LoginPage() {
           <Button
             variant="outline"
             formAction={signup}
-            className="flex-1"
+            className="flex-1 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-[0_0_15px_rgba(139,92,246,0.5)] dark:hover:bg-violet-900/50"
           >
+            <UserPlus className="w-4 h-4 mr-1.5" />
             Sign up
           </Button>
         </div>

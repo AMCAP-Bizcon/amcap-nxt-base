@@ -37,7 +37,7 @@ export async function createTodo(text: string) {
     })
 
     // 3. Tell Next.js to refresh the dashboard page to show the new data
-    revalidatePath('/dashboard')
+    revalidatePath('/todo')
 }
 
 /**
@@ -59,8 +59,8 @@ export async function deleteTodo(id: number) {
     // We use the `and` operator to enforce both ID and user ownership constraints
     await db.delete(todos).where(and(eq(todos.id, id), eq(todos.userId, user.id)))
 
-    // 3. Refresh the dashboard page data
-    revalidatePath('/dashboard')
+    // 3. Refresh the todo page data
+    revalidatePath('/todo')
 }
 
 /**
@@ -85,8 +85,8 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
             .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
     }
 
-    // 3. Refresh the dashboard page data
-    revalidatePath('/dashboard')
+    // 3. Refresh the todo page data
+    revalidatePath('/todo')
 }
 
 /**
@@ -110,8 +110,8 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
             .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
     }
 
-    // 3. Refresh the dashboard page data
-    revalidatePath('/dashboard')
+    // 3. Refresh the todo page data
+    revalidatePath('/todo')
 }
 
 /**
@@ -135,8 +135,8 @@ export async function toggleTodosDoneStatus(ids: number[]) {
         .set({ done: sql`NOT ${todos.done}` })
         .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
 
-    // 3. Refresh the dashboard page data
-    revalidatePath('/dashboard')
+    // 3. Refresh the todo page data
+    revalidatePath('/todo')
 }
 
 /**
@@ -159,6 +159,6 @@ export async function deleteMultipleTodos(ids: number[]) {
         .delete(todos)
         .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
 
-    // 3. Refresh the dashboard page data
-    revalidatePath('/dashboard')
+    // 3. Refresh the todo page data
+    revalidatePath('/todo')
 }

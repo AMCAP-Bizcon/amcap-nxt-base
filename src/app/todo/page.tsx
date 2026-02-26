@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createTodo } from './actions'
 import { TodoList } from './TodoList'
 
-export default async function DashboardPage() {
+export default async function ToDoPage() {
     // 1. Get the current user
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -21,7 +21,7 @@ export default async function DashboardPage() {
 
     return (
         <div className="mx-auto max-w-2xl p-8">
-            <h1 className="text-3xl font-bold mb-8">Your Dashboard</h1>
+            <h1 className="text-3xl font-bold mb-8">Your ToDo List</h1>
 
             <TodoList initialTodos={userTodos} />
         </div>

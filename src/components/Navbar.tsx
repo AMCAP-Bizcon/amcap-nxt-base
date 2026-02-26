@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { logout } from '@/app/auth/actions'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LogIn, LogOut } from 'lucide-react'
 
 export default async function Navbar() {
     const supabase = await createClient()
@@ -19,16 +20,19 @@ export default async function Navbar() {
                     {user ? (
                         <>
                             <span className="text-sm text-muted-foreground hidden sm:block">{user.email}</span>
-                            <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                                Dashboard
-                            </Link>
                             <form action={logout}>
-                                <Button variant="outline" type="submit">Log out</Button>
+                                <Button variant="outline" type="submit" className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-[0_0_15px_rgba(244,63,94,0.5)] dark:hover:bg-rose-900/50">
+                                    <LogOut className="w-4 h-4 mr-1.5" />
+                                    Log out
+                                </Button>
                             </form>
                         </>
                     ) : (
                         <Link href="/login">
-                            <Button variant="outline">Log in</Button>
+                            <Button variant="outline" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] dark:hover:bg-emerald-900/50">
+                                <LogIn className="w-4 h-4 mr-1.5" />
+                                Log in
+                            </Button>
                         </Link>
                     )}
                     <ThemeToggle />

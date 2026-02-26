@@ -196,34 +196,34 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
             <div className="flex justify-center flex-wrap gap-3 mb-4">
                 {mode === 'idle' ? (
                     <>
-                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="text-violet-600 hover:text-violet-700 hover:bg-violet-50">
+                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-[0_0_15px_rgba(139,92,246,0.5)]">
                             <PlusCircle className="w-4 h-4 mr-1.5" />
                             Create
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)]">
                             <Edit2 className="w-4 h-4 mr-1.5" />
                             Edit
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
+                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-[0_0_15px_rgba(245,158,11,0.5)]">
                             <MoveVertical className="w-4 h-4 mr-1.5" />
                             Move
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]">
                             <CheckSquare className="w-4 h-4 mr-1.5" />
                             Complete
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50">
+                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-[0_0_15px_rgba(244,63,94,0.5)]">
                             <Trash2 className="w-4 h-4 mr-1.5" />
                             Remove
                         </Button>
                     </>
                 ) : (
                     <>
-                        <Button variant="ghost" size="sm" onClick={handleDiscard} disabled={isSaving} className="text-muted-foreground hover:bg-muted/50">
+                        <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-[0_0_15px_rgba(100,116,139,0.5)] dark:hover:bg-slate-900/50">
                             <XCircle className="w-4 h-4 mr-1.5" />
                             Discard
                         </Button>
-                        <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving} className="bg-primary hover:bg-primary/90">
+                        <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] dark:hover:bg-sky-900/50">
                             <Save className="w-4 h-4 mr-1.5" />
                             {isSaving ? 'Saving...' : 'Save'}
                         </Button>
