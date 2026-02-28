@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon } from 'lucide-react'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 import { updateTodoDetails } from './actions'
+import { createClient } from '@/utils/supabase/client'
 
-import { forwardRef, useImperativeHandle } from 'react'
+import { forwardRef, useImperativeHandle, useRef } from 'react'
 
 export interface TodoDetailsPanelRef {
     handleSave: () => Promise<void>;
@@ -32,9 +33,11 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         parentId: number | null;
     }>({ description: '', images: [], files: [], parentId: null })
 
-    const [newImageUrl, setNewImageUrl] = useState('')
-    const [newFileName, setNewFileName] = useState('')
-    const [newFileUrl, setNewFileUrl] = useState('')
+    const [isUploading, setIsUploading] = useState(false)
+    const imageInputRef = useRef<HTMLInputElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const supabase = createClient()
 
     // Reset local state when todo changes
     useEffect(() => {
@@ -45,9 +48,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 files: Array.isArray(todo.files) ? todo.files : [],
                 parentId: todo.parentId,
             })
-            setNewImageUrl('')
-            setNewFileName('')
-            setNewFileUrl('')
         }
     }, [todo])
 
@@ -71,13 +71,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         }
     }
 
-    const addImage = () => {
-        if (newImageUrl.trim()) {
-            setDetails(prev => ({ ...prev, images: [...prev.images, newImageUrl.trim()] }))
-            setNewImageUrl('')
-        }
-    }
-
     const removeImage = (index: number) => {
         setDetails(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }))
     }
@@ -95,22 +88,68 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     useImperativeHandle(ref, () => ({
         handleSave,
         promptAddImage: () => {
-            const url = window.prompt("Enter image URL:");
-            if (url) {
-                setDetails(prev => ({ ...prev, images: [...prev.images, url.trim()] }));
-            }
+            imageInputRef.current?.click();
         },
         promptAddFile: () => {
-            const name = window.prompt("Enter file name:");
-            if (name) {
-                const url = window.prompt("Enter file URL:");
-                if (url) {
-                    addFile(name, url);
-                }
-            }
+            fileInputRef.current?.click();
         },
         isSaving
     }));
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0 || !todo) return;
+
+        const file = e.target.files[0];
+        setIsUploading(true);
+        try {
+            const ext = file.name.split('.').pop();
+            const fileName = `${todo.userId}/${todo.id}/${Date.now()}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('todo-media')
+                .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('todo-media').getPublicUrl(fileName);
+
+            setDetails(prev => ({ ...prev, images: [...prev.images, data.publicUrl] }));
+        } catch (error) {
+            console.error('Failed to upload image:', error);
+            alert('Failed to upload image. Please try again.');
+        } finally {
+            setIsUploading(false);
+            if (imageInputRef.current) imageInputRef.current.value = '';
+        }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0 || !todo) return;
+
+        const file = e.target.files[0];
+        const originalName = file.name;
+        setIsUploading(true);
+        try {
+            const ext = file.name.split('.').pop() || 'bin';
+            const fileName = `${todo.userId}/${todo.id}/${Date.now()}_${originalName.replace(/\s+/g, '_')}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('todo-media')
+                .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('todo-media').getPublicUrl(fileName);
+
+            addFile(originalName, data.publicUrl);
+        } catch (error) {
+            console.error('Failed to upload file:', error);
+            alert('Failed to upload file. Please try again.');
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     return (
         <div className="w-full h-full bg-card border-l border-border flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
@@ -198,7 +237,31 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 </div>
             </div>
 
+            {/* Hidden Inputs for Uploads */}
+            <input
+                type="file"
+                ref={imageInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+            />
+            <input
+                type="file"
+                ref={fileInputRef}
+                accept="*"
+                className="hidden"
+                onChange={handleFileUpload}
+            />
 
+            {/* Show an uploading indicator if necessary */}
+            {isUploading && (
+                <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-card shadow-lg border border-border rounded-md px-6 py-4 flex items-center gap-3">
+                        <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary"></div>
+                        <span className="text-sm font-medium">Uploading...</span>
+                    </div>
+                </div>
+            )}
         </div>
     )
 })

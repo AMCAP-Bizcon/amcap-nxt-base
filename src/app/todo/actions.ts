@@ -3,7 +3,44 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { todos, type Todo } from '@/db/schema'
-import { requireUser } from '@/utils/supabase/server'
+import { requireUser, createClient } from '@/utils/supabase/server'
+
+/**
+ * Helper function to bulk delete media files from the Supabase Storage bucket
+ * based on their public URLs.
+ * 
+ * @param {any} supabase - The initialized Supabase server client
+ * @param {Pick<Todo, 'images' | 'files'>[]} todosToDelete - The list of todos containing media to delete
+ */
+async function deleteAssociatedMedia(supabase: any, todosToDelete: Pick<Todo, 'images' | 'files'>[]) {
+    const urlsToDelete: string[] = [];
+
+    for (const todo of todosToDelete) {
+        if (Array.isArray(todo.images)) {
+            urlsToDelete.push(...todo.images);
+        }
+        if (Array.isArray(todo.files)) {
+            for (const file of todo.files) {
+                if (file && typeof file === 'object' && 'url' in file && typeof file.url === 'string') {
+                    urlsToDelete.push(file.url);
+                }
+            }
+        }
+    }
+
+    if (urlsToDelete.length === 0) return;
+
+    const pathsToDelete = urlsToDelete
+        .map(url => {
+            const match = url.match(/todo-media\/(.+)$/);
+            return match ? match[1] : null;
+        })
+        .filter((path): path is string => path !== null);
+
+    if (pathsToDelete.length > 0) {
+        await supabase.storage.from('todo-media').remove(pathsToDelete);
+    }
+}
 import { eq, and, inArray, sql } from 'drizzle-orm'
 
 /**
@@ -48,12 +85,23 @@ export async function createTodo(text: string) {
 export async function deleteTodo(id: number) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    const supabase = await createClient()
 
-    // 2. Delete the record from the database only if it belongs to the authenticated user
+    // 2. Lookup existing media to delete from the storage bucket
+    const [todoToDel] = await db
+        .select({ images: todos.images, files: todos.files })
+        .from(todos)
+        .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+
+    if (todoToDel) {
+        await deleteAssociatedMedia(supabase, [todoToDel as Pick<Todo, 'images' | 'files'>]);
+    }
+
+    // 3. Delete the record from the database only if it belongs to the authenticated user
     // We use the `and` operator to enforce both ID and user ownership constraints
     await db.delete(todos).where(and(eq(todos.id, id), eq(todos.userId, user.id)))
 
-    // 3. Refresh the todo page data
+    // 4. Refresh the todo page data
     revalidatePath('/todo')
 }
 
@@ -138,15 +186,24 @@ export async function toggleTodosDoneStatus(ids: number[]) {
 export async function deleteMultipleTodos(ids: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    const supabase = await createClient()
 
     if (ids.length === 0) return
 
-    // 2. Perform bulk delete
+    // 2. Lookup existing media to delete from the storage bucket
+    const todosToDelete = await db
+        .select({ images: todos.images, files: todos.files })
+        .from(todos)
+        .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+
+    await deleteAssociatedMedia(supabase, todosToDelete as Pick<Todo, 'images' | 'files'>[]);
+
+    // 3. Perform bulk delete
     await db
         .delete(todos)
         .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
 
-    // 3. Refresh the todo page data
+    // 4. Refresh the todo page data
     revalidatePath('/todo')
 }
 
@@ -160,13 +217,56 @@ export async function deleteMultipleTodos(ids: number[]) {
 export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files' | 'parentId'>>) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    const supabase = await createClient()
 
-    // 2. Perform update
+    // 2. If files or images are updated, we check for removed ones and delete them from storage to avoid orphaned files
+    if (details.images !== undefined || details.files !== undefined) {
+        const [existingTodo] = await db
+            .select({ images: todos.images, files: todos.files })
+            .from(todos)
+            .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+
+        if (existingTodo) {
+            const urlsToDelete: string[] = [];
+
+            if (details.images !== undefined) {
+                const oldImages = Array.isArray(existingTodo.images) ? existingTodo.images as string[] : [];
+                const newImages = Array.isArray(details.images) ? details.images as string[] : [];
+                urlsToDelete.push(...oldImages.filter(img => !newImages.includes(img)));
+            }
+
+            if (details.files !== undefined) {
+                const oldFiles = Array.isArray(existingTodo.files) ? existingTodo.files as any[] : [];
+                const newFiles = Array.isArray(details.files) ? details.files as any[] : [];
+
+                oldFiles.forEach(oldFile => {
+                    if (oldFile && oldFile.url && !newFiles.some(nf => nf.url === oldFile.url)) {
+                        urlsToDelete.push(oldFile.url);
+                    }
+                });
+            }
+
+            if (urlsToDelete.length > 0) {
+                const pathsToDelete = urlsToDelete
+                    .map(url => {
+                        const match = url.match(/todo-media\/(.+)$/);
+                        return match ? match[1] : null;
+                    })
+                    .filter((path): path is string => path !== null);
+
+                if (pathsToDelete.length > 0) {
+                    await supabase.storage.from('todo-media').remove(pathsToDelete);
+                }
+            }
+        }
+    }
+
+    // 3. Perform update
     await db
         .update(todos)
         .set(details)
         .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
 
-    // 3. Refresh the todo page data
+    // 4. Refresh the todo page data
     revalidatePath('/todo')
 }
