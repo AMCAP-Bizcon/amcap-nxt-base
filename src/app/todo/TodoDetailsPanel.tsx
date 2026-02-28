@@ -7,6 +7,15 @@ import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon } from 'lucide-
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 import { updateTodoDetails } from './actions'
 
+import { forwardRef, useImperativeHandle } from 'react'
+
+export interface TodoDetailsPanelRef {
+    handleSave: () => Promise<void>;
+    promptAddImage: () => void;
+    promptAddFile: () => void;
+    isSaving: boolean;
+}
+
 interface TodoDetailsPanelProps {
     todo: Todo | null
     allTodos: Todo[]
@@ -14,7 +23,7 @@ interface TodoDetailsPanelProps {
     onSaved: () => void
 }
 
-export function TodoDetailsPanel({ todo, allTodos, onClose, onSaved }: TodoDetailsPanelProps) {
+export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, onClose, onSaved }, ref) => {
     const [isSaving, setIsSaving] = useState(false)
     const [details, setDetails] = useState<{
         description: string;
@@ -73,17 +82,35 @@ export function TodoDetailsPanel({ todo, allTodos, onClose, onSaved }: TodoDetai
         setDetails(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }))
     }
 
-    const addFile = () => {
-        if (newFileName.trim() && newFileUrl.trim()) {
-            setDetails(prev => ({ ...prev, files: [...prev.files, { name: newFileName.trim(), url: newFileUrl.trim() }] }))
-            setNewFileName('')
-            setNewFileUrl('')
+    const addFile = (name: string, url: string) => {
+        if (name.trim() && url.trim()) {
+            setDetails(prev => ({ ...prev, files: [...prev.files, { name: name.trim(), url: url.trim() }] }))
         }
     }
 
     const removeFile = (index: number) => {
         setDetails(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== index) }))
     }
+
+    useImperativeHandle(ref, () => ({
+        handleSave,
+        promptAddImage: () => {
+            const url = window.prompt("Enter image URL:");
+            if (url) {
+                setDetails(prev => ({ ...prev, images: [...prev.images, url.trim()] }));
+            }
+        },
+        promptAddFile: () => {
+            const name = window.prompt("Enter file name:");
+            if (name) {
+                const url = window.prompt("Enter file URL:");
+                if (url) {
+                    addFile(name, url);
+                }
+            }
+        },
+        isSaving
+    }));
 
     return (
         <div className="w-full h-full bg-card border-l border-border flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
@@ -149,10 +176,6 @@ export function TodoDetailsPanel({ todo, allTodos, onClose, onSaved }: TodoDetai
                             ))}
                         </div>
                     )}
-                    <div className="flex gap-2 isolate group hover:shadow-[0_0_15px_rgba(139,92,246,0.2)] transition-all rounded-md focus-within:shadow-[0_0_15px_rgba(139,92,246,0.3)] duration-300">
-                        <input type="text" value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} placeholder="Image URL..." onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addImage(); } }} className="flex-1 bg-background border border-input rounded-l-md px-3 py-2 text-sm focus:outline-none z-10 transition-colors" />
-                        <Button onClick={addImage} variant="secondary" className="rounded-l-none border border-l-0 border-input z-0 hover:bg-violet-100 hover:text-violet-700 dark:hover:bg-violet-900/40" type="button">Add</Button>
-                    </div>
                 </div>
 
                 {/* Files List */}
@@ -172,22 +195,12 @@ export function TodoDetailsPanel({ todo, allTodos, onClose, onSaved }: TodoDetai
                             ))}
                         </ul>
                     )}
-                    <div className="flex gap-2 isolate group hover:shadow-[0_0_15px_rgba(14,165,233,0.2)] transition-all rounded-md focus-within:shadow-[0_0_15px_rgba(14,165,233,0.3)] duration-300">
-                        <input type="text" value={newFileName} onChange={e => setNewFileName(e.target.value)} placeholder="File Name" className="flex-[0.4] bg-background border border-input rounded-l-md px-3 py-2 text-sm focus:outline-none z-10" />
-                        <input type="text" value={newFileUrl} onChange={e => setNewFileUrl(e.target.value)} placeholder="File URL" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFile(); } }} className="flex-[0.6] bg-background border border-l-0 border-input px-3 py-2 text-sm focus:outline-none z-10" />
-                        <Button onClick={addFile} variant="secondary" className="rounded-l-none border border-l-0 border-input z-0 hover:bg-sky-100 hover:text-sky-700 dark:hover:bg-sky-900/40" type="button">Add</Button>
-                    </div>
                 </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-border bg-muted/20 flex justify-end gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] flex-shrink-0">
-                <Button variant="outline" onClick={onClose} disabled={isSaving} className="hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 dark:hover:bg-rose-950/40 shadow-sm transition-all">Cancel</Button>
-                <Button onClick={handleSave} disabled={isSaving} className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all border-0">
-                    <Save className="h-4 w-4 mr-1.5" />
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                </Button>
-            </div>
+
         </div>
     )
-}
+})
+
+TodoDetailsPanel.displayName = 'TodoDetailsPanel'

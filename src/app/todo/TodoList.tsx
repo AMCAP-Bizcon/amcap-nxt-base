@@ -21,7 +21,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { updateTodoSequence, updateTodoTexts, toggleTodosDoneStatus, deleteMultipleTodos, createTodo } from './actions'
-import { TodoDetailsPanel } from './TodoDetailsPanel'
+import { TodoDetailsPanel, type TodoDetailsPanelRef } from './TodoDetailsPanel'
+import { Image as ImageIcon, FileText } from 'lucide-react'
 import {
     ResizableHandle,
     ResizablePanel,
@@ -107,6 +108,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     const [isSaving, setIsSaving] = useState(false)
     const [newTodoText, setNewTodoText] = useState('')
     const [isMobile, setIsMobile] = useState(false)
+    const detailsPanelRef = useRef<TodoDetailsPanelRef>(null)
 
     useEffect(() => {
         const checkIsMobile = () => setIsMobile(window.innerWidth < 768)
@@ -272,48 +274,62 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     return (
         <div className={`w-full flex flex-col max-h-full transition-all duration-300 ease-in-out ${selectedDetailsTodoId ? 'max-w-full' : 'max-w-2xl'}`}>
             {/* Toolbar */}
-            <div className={`grid shrink-0 gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-5' : 'grid-cols-2'}`}>
-                {mode === 'idle' ? (
-                    <>
-                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-2 sm:px-3">
-                            <PlusCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                            <span className="hidden sm:inline">Create</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-2 sm:px-3">
-                            <Edit2 className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                            <span className="hidden sm:inline">Edit</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="w-full h-11 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm px-2 sm:px-3">
-                            <MoveVertical className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                            <span className="hidden sm:inline">Move</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-2 sm:px-3">
-                            <CheckSquare className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                            <span className="hidden sm:inline">Complete</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="w-full h-11 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm px-2 sm:px-3">
-                            <Trash2 className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                            <span className="hidden sm:inline">Remove</span>
-                        </Button>
-                    </>
-                ) : (
-                    <>
-                        <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="w-full h-11 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50 px-2 sm:px-3">
-                            <XCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                            <span className="hidden sm:inline">Discard (Esc)</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="w-full h-11 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50 px-2 sm:px-3">
-                            <Save className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                            <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save (Enter)'}</span>
-                        </Button>
-                    </>
-                )}
-            </div>
+            {selectedDetailsTodoId ? (
+                <div className="grid shrink-0 gap-3 mb-8 w-full grid-cols-3">
+                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddImage()} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-2 sm:px-3">
+                        <ImageIcon className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                        <span className="hidden sm:inline">Add Image</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddFile()} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-2 sm:px-3">
+                        <FileText className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                        <span className="hidden sm:inline">Add File</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.handleSave()} disabled={detailsPanelRef.current?.isSaving} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-2 sm:px-3">
+                        <Save className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                        <span className="hidden sm:inline">{detailsPanelRef.current?.isSaving ? 'Saving...' : 'Save Details'}</span>
+                    </Button>
+                </div>
+            ) : (
+                <div className={`grid shrink-0 gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-5' : 'grid-cols-2'}`}>
+                    {mode === 'idle' ? (
+                        <>
+                            <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-2 sm:px-3">
+                                <PlusCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Create</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-2 sm:px-3">
+                                <Edit2 className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Edit</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="w-full h-11 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm px-2 sm:px-3">
+                                <MoveVertical className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Move</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setMode('done')} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-2 sm:px-3">
+                                <CheckSquare className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Complete</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="w-full h-11 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm px-2 sm:px-3">
+                                <Trash2 className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Remove</span>
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="w-full h-11 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50 px-2 sm:px-3">
+                                <XCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Discard (Esc)</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="w-full h-11 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50 px-2 sm:px-3">
+                                <Save className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save (Enter)'}</span>
+                            </Button>
+                        </>
+                    )}
+                </div>
+            )}
 
-            {/* Glowing Separator */}
-            <div className={`h-[1.5px] shrink-0 w-[150%] relative left-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent ${modeStyles[mode].gradient} to-transparent my-8 blur-[0.5px] ${modeStyles[mode].shadow} transition-all duration-300 ease-out`} aria-hidden="true" />
-
-            <ResizablePanelGroup orientation={isMobile ? "vertical" : "horizontal"} className={`w-full flex-initial items-stretch rounded-lg border border-border bg-card/50 shadow-sm overflow-hidden ${isMobile ? 'min-h-[500px]' : 'min-h-[100px]'}`}>
+            <ResizablePanelGroup orientation={isMobile ? "vertical" : "horizontal"} className={`w-full flex-initial items-stretch rounded-lg border border-border bg-card/50 ${modeStyles[mode].shadow} transition-shadow duration-300 ease-out overflow-hidden ${isMobile ? 'min-h-[500px]' : 'min-h-[100px]'}`}>
 
                 {/* Left Panel: The List */}
                 <ResizablePanel defaultSize={selectedDetailsTodoId ? 20 : 100} minSize={30} className="transition-all duration-300 ease-in-out h-full flex flex-col">
@@ -380,6 +396,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                         <ResizableHandle withHandle className="bg-border/50 hover:bg-primary/20 transition-colors" />
                         <ResizablePanel defaultSize={55} minSize={40} className="h-full animate-in slide-in-from-right-10 fade-in duration-300">
                             <TodoDetailsPanel
+                                ref={detailsPanelRef}
                                 todo={todos.find(t => t.id === selectedDetailsTodoId) || null}
                                 allTodos={todos}
                                 onClose={() => setSelectedDetailsTodoId(null)}
