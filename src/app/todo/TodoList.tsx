@@ -329,7 +329,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                 </div>
             )}
 
-            <ResizablePanelGroup orientation={isMobile ? "vertical" : "horizontal"} className={`w-full flex-initial items-stretch rounded-lg border border-border bg-card/50 ${modeStyles[mode].shadow} transition-shadow duration-300 ease-out overflow-hidden ${isMobile ? 'min-h-[500px]' : 'min-h-[100px]'}`}>
+            <ResizablePanelGroup orientation={isMobile ? "vertical" : "horizontal"} className={`w-full flex-initial items-stretch rounded-lg border border-border bg-card/50 ${modeStyles[mode].shadow} transition-shadow duration-300 ease-out overflow-hidden ${isMobile ? 'min-h-[400px]' : 'min-h-[100px]'}`}>
 
                 {/* Left Panel: The List */}
                 <ResizablePanel defaultSize={selectedDetailsTodoId ? 20 : 100} minSize={30} className="transition-all duration-300 ease-in-out h-full flex flex-col">
