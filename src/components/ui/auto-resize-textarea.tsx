@@ -18,12 +18,34 @@ export function AutoResizeTextarea({
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    useEffect(() => {
+    const adjustHeight = () => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
+    };
+
+    useEffect(() => {
+        adjustHeight();
     }, [value]);
+
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        let lastWidth = textarea.clientWidth;
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (textarea.clientWidth !== lastWidth) {
+                lastWidth = textarea.clientWidth;
+                adjustHeight();
+            }
+        });
+
+        resizeObserver.observe(textarea);
+
+        return () => resizeObserver.disconnect();
+    }, []);
 
     return (
         <textarea

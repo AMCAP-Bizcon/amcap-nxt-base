@@ -21,6 +21,12 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { updateTodoSequence, updateTodoTexts, toggleTodosDoneStatus, deleteMultipleTodos, createTodo } from './actions'
+import { TodoDetailsPanel } from './TodoDetailsPanel'
+import {
+    ResizableHandle,
+    ResizablePanel,
+    ResizablePanelGroup,
+} from "@/components/ui/resizable"
 
 import { type Todo } from '@/db/schema'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
@@ -31,7 +37,7 @@ import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
  * Represents an individual todo item that can be dragged and dropped.
  * Handles display, editing, and selection states for each item.
  */
-function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, onStartEdit, onTextChange, isSelectable, isSelected, onSelectToggle }: { id: number, todo: Todo, isReordering: boolean, isEditing: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void }) {
+function SortableItem({ id, todo, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle }: { id: number, todo: Todo, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void }) {
     const {
         attributes,
         listeners,
@@ -61,7 +67,7 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
                     className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
                 />
             )}
-            <div className={`flex flex-col gap-1 w-full ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => { if (isEditing) onStartEdit(id) }}>
+            <div className={`flex flex-col gap-1 w-full ${isEditing || isIdle ? 'cursor-pointer' : ''}`} onClick={() => { if (isEditing) onStartEdit(id); else if (isIdle) onOpenDetails(id); }}>
                 {isCurrentlyEditing ? (
                     <AutoResizeTextarea
                         value={todo.text}
@@ -96,6 +102,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     const [todos, setTodos] = useState(initialTodos)
     const [mode, setMode] = useState<'idle' | 'reordering' | 'editing' | 'done' | 'delete' | 'creating'>('idle')
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null)
+    const [selectedDetailsTodoId, setSelectedDetailsTodoId] = useState<number | null>(null)
     const [selectedTodoIds, setSelectedTodoIds] = useState<number[]>([])
     const [isSaving, setIsSaving] = useState(false)
     const [newTodoText, setNewTodoText] = useState('')
@@ -255,9 +262,9 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     }
 
     return (
-        <div className="w-full">
+        <div className={`w-full flex flex-col max-h-full transition-all duration-300 ease-in-out ${selectedDetailsTodoId ? 'max-w-full' : 'max-w-2xl'}`}>
             {/* Toolbar */}
-            <div className={`grid gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2'}`}>
+            <div className={`grid shrink-0 gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2'}`}>
                 {mode === 'idle' ? (
                     <>
                         <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm">
@@ -296,60 +303,86 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
             </div>
 
             {/* Glowing Separator */}
-            <div className={`h-[1.5px] w-[150%] relative left-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent ${modeStyles[mode].gradient} to-transparent my-8 blur-[0.5px] ${modeStyles[mode].shadow} transition-all duration-300 ease-out`} aria-hidden="true" />
+            <div className={`h-[1.5px] shrink-0 w-[150%] relative left-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent ${modeStyles[mode].gradient} to-transparent my-8 blur-[0.5px] ${modeStyles[mode].shadow} transition-all duration-300 ease-out`} aria-hidden="true" />
 
-            {/* The List to Display Data */}
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-            >
-                <SortableContext
-                    items={todos.map(t => t.id)}
-                    strategy={verticalListSortingStrategy}
-                >
-                    <ul className="space-y-3">
-                        {mode === 'creating' && (
-                            <li className="p-4 border border-primary/50 shadow-md rounded-md bg-card text-card-foreground flex gap-3 items-center transition-colors">
-                                <div className="flex flex-col gap-1 w-full relative">
-                                    <AutoResizeTextarea
-                                        value={newTodoText}
-                                        onChange={(e) => setNewTodoText(e.target.value)}
-                                        placeholder="What needs to be done?"
-                                        className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 py-1 resize-none overflow-hidden"
-                                        autoFocus
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            </li>
-                        )}
-                        {todos.map((todo) => (
-                            <SortableItem
-                                key={todo.id}
-                                id={todo.id}
-                                todo={todo}
-                                isReordering={mode === 'reordering'}
-                                isEditing={mode === 'editing'}
-                                isCurrentlyEditing={editingTodoId === todo.id}
-                                onStartEdit={setEditingTodoId}
-                                onTextChange={handleTextChange}
-                                isSelectable={mode === 'done' || mode === 'delete'}
-                                isSelected={selectedTodoIds.includes(todo.id)}
-                                onSelectToggle={handleSelectToggle}
+            <ResizablePanelGroup orientation="horizontal" className="w-full flex-initial min-h-[100px] items-stretch rounded-lg border border-border bg-card/50 shadow-sm overflow-hidden">
+
+                {/* Left Panel: The List */}
+                <ResizablePanel defaultSize={selectedDetailsTodoId ? 20 : 100} minSize={30} className="transition-all duration-300 ease-in-out h-full flex flex-col">
+                    <div className="flex-1 overflow-y-auto p-4 pr-2 min-h-0">
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={todos.map(t => t.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <ul className="space-y-3">
+                                    {mode === 'creating' && (
+                                        <li className="p-4 border border-primary/50 shadow-md rounded-md bg-card text-card-foreground flex gap-3 items-center transition-colors">
+                                            <div className="flex flex-col gap-1 w-full relative">
+                                                <AutoResizeTextarea
+                                                    value={newTodoText}
+                                                    onChange={(e) => setNewTodoText(e.target.value)}
+                                                    placeholder="What needs to be done?"
+                                                    className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 py-1 resize-none overflow-hidden"
+                                                    autoFocus
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </li>
+                                    )}
+                                    {todos.map((todo) => (
+                                        <SortableItem
+                                            key={todo.id}
+                                            id={todo.id}
+                                            todo={todo}
+                                            isReordering={mode === 'reordering'}
+                                            isEditing={mode === 'editing'}
+                                            isIdle={mode === 'idle'}
+                                            isCurrentlyEditing={editingTodoId === todo.id}
+                                            onStartEdit={setEditingTodoId}
+                                            onOpenDetails={setSelectedDetailsTodoId}
+                                            onTextChange={handleTextChange}
+                                            isSelectable={mode === 'done' || mode === 'delete'}
+                                            isSelected={selectedTodoIds.includes(todo.id)}
+                                            onSelectToggle={handleSelectToggle}
+                                        />
+                                    ))}
+                                    {todos.length === 0 && mode !== 'creating' && (
+                                        <p className="text-muted-foreground text-center mt-8 py-8 border-2 border-dashed border-border rounded-lg">
+                                            No todos yet. Click &quot;Create&quot; to start!
+                                        </p>
+                                    )}
+                                </ul>
+                            </SortableContext>
+                        </DndContext>
+                    </div>
+                </ResizablePanel>
+
+                {/* Right Panel: The Details Form */}
+                {selectedDetailsTodoId && (
+                    <>
+                        <ResizableHandle withHandle className="bg-border/50 hover:bg-primary/20 transition-colors" />
+                        <ResizablePanel defaultSize={55} minSize={40} className="h-full animate-in slide-in-from-right-10 fade-in duration-300">
+                            <TodoDetailsPanel
+                                todo={todos.find(t => t.id === selectedDetailsTodoId) || null}
+                                allTodos={todos}
+                                onClose={() => setSelectedDetailsTodoId(null)}
+                                onSaved={() => {
+                                    // Handled automatically via Next.js revalidatePath from server action
+                                }}
                             />
-                        ))}
-                        {todos.length === 0 && mode !== 'creating' && (
-                            <p className="text-muted-foreground text-center mt-8 py-8 border-2 border-dashed border-border rounded-lg">
-                                No todos yet. Click &quot;Create&quot; to start!
-                            </p>
-                        )}
-                    </ul>
-                </SortableContext>
-            </DndContext>
+                        </ResizablePanel>
+                    </>
+                )}
+            </ResizablePanelGroup>
         </div>
     )
 }

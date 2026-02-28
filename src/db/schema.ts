@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, timestamp, uuid, integer } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, boolean, timestamp, uuid, integer, jsonb } from 'drizzle-orm/pg-core';
 import { type InferSelectModel } from 'drizzle-orm';
 
 
@@ -16,6 +16,10 @@ import { type InferSelectModel } from 'drizzle-orm';
 export const todos = pgTable('todos', {
     id: serial('id').primaryKey(),
     text: text('text').notNull(),
+    description: text('description'),
+    images: jsonb('images').default('[]').notNull(),
+    files: jsonb('files').default('[]').notNull(),
+    parentId: integer('parent_id'),
     done: boolean('done').default(false).notNull(),
     userId: uuid('user_id').notNull(),
     sequence: integer('sequence').default(0).notNull(),

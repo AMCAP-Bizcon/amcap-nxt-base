@@ -20,7 +20,7 @@ export default async function ToDoPage() {
         .orderBy(todos.sequence, todos.createdAt)
 
     return (
-        <div className="mx-auto max-w-2xl p-8">
+        <div className="flex justify-center p-8 w-full flex-1 min-h-0">
             <TodoList initialTodos={userTodos} />
         </div>
     )

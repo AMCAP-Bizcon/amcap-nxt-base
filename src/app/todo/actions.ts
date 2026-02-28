@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
-import { todos } from '@/db/schema'
+import { todos, type Todo } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
 import { eq, and, inArray, sql } from 'drizzle-orm'
 
@@ -145,6 +145,27 @@ export async function deleteMultipleTodos(ids: number[]) {
     await db
         .delete(todos)
         .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+
+    // 3. Refresh the todo page data
+    revalidatePath('/todo')
+}
+
+/**
+ * Updates the details of a specific Todo item.
+ * 
+ * @param {number} id - The ID of the Todo item
+ * @param {Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files' | 'parentId'>>} details - The fields to update
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files' | 'parentId'>>) {
+    // 1. Verify who is making the request
+    const user = await requireUser()
+
+    // 2. Perform update
+    await db
+        .update(todos)
+        .set(details)
+        .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')
