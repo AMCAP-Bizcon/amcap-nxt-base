@@ -9,6 +9,7 @@ A production-ready, infinitely scalable Full-Stack SaaS boilerplate. Built with 
 * **Auth & Backend:** [Supabase](https://supabase.com/) (PostgreSQL, `@supabase/ssr`)
 * **ORM:** [Drizzle ORM](https://orm.drizzle.team/) (Edge-compatible, type-safe)
 * **UI Components:** [shadcn/ui](https://ui.shadcn.com/) (Owned, customizable components)
+* **Interactions:** [@dnd-kit](https://dndkit.com/) (Accessible, touch-friendly Drag & Drop)
 * **Deployment:** [Vercel](https://vercel.com/) (Zero-config CI/CD)
 
 ## ✨ Core Features
@@ -17,7 +18,13 @@ A production-ready, infinitely scalable Full-Stack SaaS boilerplate. Built with 
 * **Modern Auth Flow:** Uses `@supabase/ssr` with cookie-based sessions.
 * **Edge Routing:** Route protection handled via Next.js 16 `proxy.ts` (the high-performance replacement for the deprecated `middleware.ts`).
 * **Connection Pooling:** Configured to safely handle serverless database connections without crashing Postgres.
-* **Ready-to-Use UI:** Includes a global authentication Navbar, login/signup forms, and a protected user dashboard reading/writing to the database.
+* **App Icons Grid UX:** iOS-inspired dynamic grid layout on the home page with hover animations and an emerald-themed aesthetic.
+* **Interactive Dashboard (Todo App):** Complete CRUD task management system built-in:
+  - **Drag and Drop Reordering:** Mobile-responsive, touch-screen compatible vertical reordering.
+  - **Inline Editing:** Seamlessly edit tasks inline with Save/Discard toolbar actions.
+  - **Power User Shortcuts:** Keyboard workflow support (`Enter` to save, `Esc` to discard).
+  - **Optimistic UI:** Instant UI feedback on marking tasks, reordering, and saving—eliminating layout shifts and rendering latency.
+* **Ready-to-Use Components:** Includes a global authentication Navbar, login/signup forms, and protected user routes.
 
 ---
 
@@ -77,10 +84,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 src/
 ├── app/
 │   ├── auth/actions.ts      # Server Actions for login/signup/logout
-│   ├── dashboard/           # Protected route (User specific data)
+│   ├── dashboard/           # Protected route (User specific data & interactive todo list)
 │   ├── login/               # Authentication UI
 │   ├── layout.tsx           # Global layout (includes Navbar)
-│   └── page.tsx             # Public landing page
+│   └── page.tsx             # Public landing page (App Icons Grid)
 ├── components/
 │   ├── ui/                  # shadcn/ui primitives (Button, Input, etc.)
 │   └── Navbar.tsx           # Global navigation with auth state
@@ -126,6 +133,18 @@ When you update `src/db/schema.ts` with new tables or columns, sync it to your d
 ```bash
 npx drizzle-kit push
 ```
+
+## 📐 Coding Guidelines
+
+When contributing to this repository, please adhere to the following best practices to ensure efficiency, scalability, maintainability, and reusability:
+
+- **Documentation & Context:** Please provide descriptive docstrings for all functions, components, and significant code blocks.
+- **Performance First:** Optimize for rendering performance. Avoid unnecessary re-renders in React by using memoization (`useMemo`, `useCallback`) only when computationally necessary, and by keeping state as close to where it’s used as possible.
+- **Optimistic UI:** Always implement Optimistic UI patterns for data mutations to ensure a snappy, latency-free user experience, falling back gracefully on server errors.
+- **Component Reusability:** Build components that are small, focused, and single-purpose. If logic is repeated, extract it into a reusable hook or utility function.
+- **Type Safety:** Ensure strict typing with TypeScript. Avoid `any` types; define clear interfaces for component props, API responses, and database schemas.
+- **Scalable Styling:** When customizing UI components or adding new styles, use Tailwind utility classes consistently. Maintain existing design tokens (e.g., custom variables in `globals.css`) rather than hardcoding values.
+- **Clean Code Constraints:** Keep functions short and readable. Follow the Single Responsibility Principle (SRP) to ensure each module or function does exactly one thing well.
 
 ## 🏆 Credits & Acknowledgments
 

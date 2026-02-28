@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { todos } from '@/db/schema'
-import { createClient } from '@/utils/supabase/server'
+import { requireUser } from '@/utils/supabase/server'
 import { eq, and, inArray, sql } from 'drizzle-orm'
 
 /**
@@ -15,10 +15,7 @@ import { eq, and, inArray, sql } from 'drizzle-orm'
  */
 export async function createTodo(text: string) {
     // 1. Verify who is making the request
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
+    const user = await requireUser()
 
     // Find the current minimum sequence for this user's todos
     const [result] = await db
@@ -50,10 +47,7 @@ export async function createTodo(text: string) {
  */
 export async function deleteTodo(id: number) {
     // 1. Verify who is making the request
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
+    const user = await requireUser()
 
     // 2. Delete the record from the database only if it belongs to the authenticated user
     // We use the `and` operator to enforce both ID and user ownership constraints
@@ -72,20 +66,17 @@ export async function deleteTodo(id: number) {
  */
 export async function updateTodoSequence(items: { id: number; sequence: number }[]) {
     // 1. Verify who is making the request
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await requireUser()
 
-    if (!user) throw new Error("Unauthorized")
-
-    // 2. Perform concurrent updates using Promise.all to avoid N+1 query performance hits
-    await Promise.all(
-        items.map(item =>
-            db
+    // 2. Perform sequential updates within a single transaction to prevent connection pool exhaustion
+    await db.transaction(async (tx) => {
+        for (const item of items) {
+            await tx
                 .update(todos)
                 .set({ sequence: item.sequence })
                 .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
-        )
-    )
+        }
+    })
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')
@@ -100,20 +91,17 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
  */
 export async function updateTodoTexts(items: { id: number; text: string }[]) {
     // 1. Verify who is making the request
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await requireUser()
 
-    if (!user) throw new Error("Unauthorized")
-
-    // 2. Perform concurrent updates using Promise.all
-    await Promise.all(
-        items.map(item =>
-            db
+    // 2. Perform sequential updates within a single transaction to prevent connection pool exhaustion
+    await db.transaction(async (tx) => {
+        for (const item of items) {
+            await tx
                 .update(todos)
                 .set({ text: item.text })
                 .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
-        )
-    )
+        }
+    })
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')
@@ -127,10 +115,7 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
  */
 export async function toggleTodosDoneStatus(ids: number[]) {
     // 1. Verify who is making the request
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
+    const user = await requireUser()
 
     if (ids.length === 0) return
 
@@ -152,10 +137,7 @@ export async function toggleTodosDoneStatus(ids: number[]) {
  */
 export async function deleteMultipleTodos(ids: number[]) {
     // 1. Verify who is making the request
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
+    const user = await requireUser()
 
     if (ids.length === 0) return
 

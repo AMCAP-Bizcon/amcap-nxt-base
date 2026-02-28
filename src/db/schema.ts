@@ -1,4 +1,6 @@
 import { pgTable, serial, text, boolean, timestamp, uuid, integer } from 'drizzle-orm/pg-core';
+import { type InferSelectModel } from 'drizzle-orm';
+
 
 /**
  * `todos` Database Table Schema Definition.
@@ -19,3 +21,5 @@ export const todos = pgTable('todos', {
     sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export type Todo = InferSelectModel<typeof todos>;

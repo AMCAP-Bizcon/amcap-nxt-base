@@ -22,58 +22,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { updateTodoSequence, updateTodoTexts, toggleTodosDoneStatus, deleteMultipleTodos, createTodo } from './actions'
 
-type Todo = {
-    id: number
-    text: string
-    done: boolean
-    userId: string
-    sequence: number
-    createdAt: Date
-}
-
-/**
- * AutoResizeTextarea Component
- * 
- * A reusable textarea component that automatically adjusts its height based on content.
- * Extracted to avoid inline ref callbacks which cause unnecessary React re-renders.
- */
-function AutoResizeTextarea({
-    value,
-    onChange,
-    placeholder,
-    className,
-    autoFocus,
-    onKeyDown
-}: {
-    value: string;
-    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-    placeholder?: string;
-    className?: string;
-    autoFocus?: boolean;
-    onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-}) {
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-        }
-    }, [value]);
-
-    return (
-        <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            className={className}
-            rows={1}
-            autoFocus={autoFocus}
-            onKeyDown={onKeyDown}
-        />
-    );
-}
+import { type Todo } from '@/db/schema'
+import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 
 /**
  * SortableItem Component
@@ -296,12 +246,12 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     }
 
     const modeStyles: Record<typeof mode, { gradient: string, shadow: string }> = {
-        idle: { gradient: 'via-slate-400/40', shadow: 'shadow-[0_0_15px_rgba(148,163,184,0.3)]' },
-        creating: { gradient: 'via-violet-500/50', shadow: 'shadow-[0_0_20px_rgba(139,92,246,0.4)]' },
-        editing: { gradient: 'via-blue-500/50', shadow: 'shadow-[0_0_20px_rgba(59,130,246,0.4)]' },
-        reordering: { gradient: 'via-amber-500/50', shadow: 'shadow-[0_0_20px_rgba(245,158,11,0.4)]' },
-        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-[0_0_20px_rgba(16,185,129,0.4)]' },
-        delete: { gradient: 'via-rose-500/50', shadow: 'shadow-[0_0_20px_rgba(244,63,94,0.4)]' }
+        idle: { gradient: 'via-slate-400/40', shadow: 'shadow-glow-slate' },
+        creating: { gradient: 'via-violet-500/50', shadow: 'shadow-glow-violet' },
+        editing: { gradient: 'via-blue-500/50', shadow: 'shadow-glow-blue' },
+        reordering: { gradient: 'via-amber-500/50', shadow: 'shadow-glow-amber' },
+        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' },
+        delete: { gradient: 'via-rose-500/50', shadow: 'shadow-glow-rose' }
     }
 
     return (
@@ -310,34 +260,34 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
             <div className={`grid gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2'}`}>
                 {mode === 'idle' ? (
                     <>
-                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-[0_0_15px_rgba(139,92,246,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm">
                             <PlusCircle className="w-4 h-4 mr-1.5" />
                             Create
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm">
                             <Edit2 className="w-4 h-4 mr-1.5" />
                             Edit
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="w-full h-11 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-[0_0_15px_rgba(245,158,11,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="w-full h-11 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm">
                             <MoveVertical className="w-4 h-4 mr-1.5" />
                             Move
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('done')} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm">
                             <CheckSquare className="w-4 h-4 mr-1.5" />
                             Complete
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="w-full h-11 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-[0_0_15px_rgba(244,63,94,0.5)]">
+                        <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="w-full h-11 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm">
                             <Trash2 className="w-4 h-4 mr-1.5" />
                             Remove
                         </Button>
                     </>
                 ) : (
                     <>
-                        <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="w-full h-11 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-[0_0_15px_rgba(100,116,139,0.5)] dark:hover:bg-slate-900/50">
+                        <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="w-full h-11 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50">
                             <XCircle className="w-4 h-4 mr-1.5" />
                             Discard (Esc)
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="w-full h-11 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-[0_0_15px_rgba(14,165,233,0.5)] dark:hover:bg-sky-900/50">
+                        <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="w-full h-11 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50">
                             <Save className="w-4 h-4 mr-1.5" />
                             {isSaving ? 'Saving...' : 'Save (Enter)'}
                         </Button>

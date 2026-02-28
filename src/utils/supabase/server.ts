@@ -34,3 +34,16 @@ export async function createClient() {
     }
   )
 }
+
+/**
+ * Ensures a user is authenticated, otherwise throws an error.
+ * 
+ * @returns {Promise<User>} The authenticated user object
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function requireUser() {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) throw new Error("Unauthorized")
+  return user
+}
