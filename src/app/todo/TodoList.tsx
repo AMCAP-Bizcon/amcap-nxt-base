@@ -22,7 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { updateTodoSequence, updateTodoTexts, toggleTodosDoneStatus, deleteMultipleTodos, createTodo } from './actions'
 import { TodoDetailsPanel, type TodoDetailsPanelRef } from './TodoDetailsPanel'
-import { Image as ImageIcon, FileText } from 'lucide-react'
+import { Image as ImageIcon, FileText, Camera } from 'lucide-react'
 import {
     ResizableHandle,
     ResizablePanel,
@@ -275,10 +275,14 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         <div className={`w-full flex flex-col max-h-full transition-all duration-300 ease-in-out ${selectedDetailsTodoId ? 'max-w-full' : 'max-w-2xl'}`}>
             {/* Toolbar */}
             {selectedDetailsTodoId ? (
-                <div className="grid shrink-0 gap-3 mb-8 w-full grid-cols-3">
+                <div className="grid shrink-0 gap-3 mb-8 w-full grid-cols-4">
                     <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddImage()} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-2 sm:px-3">
                         <ImageIcon className="w-4 h-4 sm:mr-1.5 shrink-0" />
                         <span className="hidden sm:inline">Add Image</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptCaptureImage()} className="w-full h-11 text-pink-600 hover:text-pink-700 hover:bg-pink-50 hover:shadow-glow-pink-sm px-2 sm:px-3">
+                        <Camera className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                        <span className="hidden sm:inline">Capture</span>
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddFile()} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-2 sm:px-3">
                         <FileText className="w-4 h-4 sm:mr-1.5 shrink-0" />

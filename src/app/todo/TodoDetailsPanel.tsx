@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { type Todo } from '@/db/schema'
 import { Button } from '@/components/ui/button'
 import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon } from 'lucide-react'
-import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { updateTodoDetails } from './actions'
 import { createClient } from '@/utils/supabase/client'
 
@@ -13,6 +13,7 @@ import { forwardRef, useImperativeHandle, useRef } from 'react'
 export interface TodoDetailsPanelRef {
     handleSave: () => Promise<void>;
     promptAddImage: () => void;
+    promptCaptureImage: () => void;
     promptAddFile: () => void;
     isSaving: boolean;
 }
@@ -35,6 +36,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
     const [isUploading, setIsUploading] = useState(false)
     const imageInputRef = useRef<HTMLInputElement>(null)
+    const captureInputRef = useRef<HTMLInputElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const supabase = createClient()
@@ -90,6 +92,9 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         promptAddImage: () => {
             imageInputRef.current?.click();
         },
+        promptCaptureImage: () => {
+            captureInputRef.current?.click();
+        },
         promptAddFile: () => {
             fileInputRef.current?.click();
         },
@@ -120,6 +125,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         } finally {
             setIsUploading(false);
             if (imageInputRef.current) imageInputRef.current.value = '';
+            if (captureInputRef.current) captureInputRef.current.value = '';
         }
     };
 
@@ -173,11 +179,10 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 {/* Description */}
                 <div>
                     <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Description</label>
-                    <AutoResizeTextarea
+                    <RichTextEditor
                         value={details.description}
-                        onChange={(e) => setDetails({ ...details, description: e.target.value })}
+                        onChange={(value) => setDetails({ ...details, description: value })}
                         placeholder="Add a more detailed description..."
-                        className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow resize-none min-h-[100px]"
                     />
                 </div>
 
@@ -242,6 +247,14 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 type="file"
                 ref={imageInputRef}
                 accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+            />
+            <input
+                type="file"
+                ref={captureInputRef}
+                accept="image/*"
+                capture="environment"
                 className="hidden"
                 onChange={handleImageUpload}
             />
