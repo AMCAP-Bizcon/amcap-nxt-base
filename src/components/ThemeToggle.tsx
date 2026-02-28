@@ -7,8 +7,12 @@ import { Button } from "@/components/ui/button"
 
 /**
  * ThemeToggle Component
- * Toggles between light and dark modes using next-themes.
- * State is persisted in localStorage.
+ * 
+ * Toggles between light and dark modes using `next-themes`.
+ * State is persisted in localStorage. It uses a mounted check
+ * to prevent hydration mismatches between server and client rendering.
+ * 
+ * @returns React Client Component for the theme toggle button.
  */
 export function ThemeToggle() {
     const { setTheme, theme, resolvedTheme } = useTheme()

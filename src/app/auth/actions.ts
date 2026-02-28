@@ -4,6 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 
+/**
+ * Authenticates a user with email and password.
+ * Receives form data from the login form, passes credentials to Supabase,
+ * and handles redirection upon success or failure.
+ * 
+ * @param {FormData} formData - The submitted form data containing 'email' and 'password'
+ * @returns {Promise<never>} Redirects to the homepage on success or login page with error on failure
+ */
 export async function login(formData: FormData) {
   const supabase = await createClient()
 
@@ -27,6 +35,13 @@ export async function login(formData: FormData) {
   redirect('/')
 }
 
+/**
+ * Registers a new user with email and password.
+ * Passes the credentials to Supabase for account creation and redirects appropriately.
+ * 
+ * @param {FormData} formData - The submitted form data containing 'email' and 'password'
+ * @returns {Promise<never>} Redirects to the homepage on success or login page with error on failure
+ */
 export async function signup(formData: FormData) {
   const supabase = await createClient()
 
@@ -47,6 +62,12 @@ export async function signup(formData: FormData) {
   redirect('/')
 }
 
+/**
+ * Logs out the currently authenticated user.
+ * Terminates the Supabase session, clears related data, and redirects to the login page.
+ * 
+ * @returns {Promise<never>} Redirects to the login page
+ */
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()

@@ -64,7 +64,8 @@ export async function deleteTodo(id: number) {
 }
 
 /**
- * Updates the sequence of multiple Todo items.
+ * Updates the sequence of multiple Todo items concurrently.
+ * Replaces N+1 sequential database updates with Promise.all for better performance.
  * 
  * @param {Array<{ id: number, sequence: number }>} items - The items with their new sequences
  * @throws {Error} If the user is unauthenticated
@@ -76,21 +77,23 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
 
     if (!user) throw new Error("Unauthorized")
 
-    // 2. Perform bulk update (looping is fine for small lists, otherwise consider batching/transactions)
-    // Note: Drizzle currently doesn't have a simple bulk update, so we update one by one
-    for (const item of items) {
-        await db
-            .update(todos)
-            .set({ sequence: item.sequence })
-            .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
-    }
+    // 2. Perform concurrent updates using Promise.all to avoid N+1 query performance hits
+    await Promise.all(
+        items.map(item =>
+            db
+                .update(todos)
+                .set({ sequence: item.sequence })
+                .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
+        )
+    )
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')
 }
 
 /**
- * Updates the text content of multiple Todo items.
+ * Updates the text content of multiple Todo items concurrently.
+ * Replaces N+1 sequential database updates with Promise.all for better performance.
  * 
  * @param {Array<{ id: number, text: string }>} items - The items with their new texts
  * @throws {Error} If the user is unauthenticated
@@ -102,13 +105,15 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
 
     if (!user) throw new Error("Unauthorized")
 
-    // 2. Perform bulk update
-    for (const item of items) {
-        await db
-            .update(todos)
-            .set({ text: item.text })
-            .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
-    }
+    // 2. Perform concurrent updates using Promise.all
+    await Promise.all(
+        items.map(item =>
+            db
+                .update(todos)
+                .set({ text: item.text })
+                .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
+        )
+    )
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')

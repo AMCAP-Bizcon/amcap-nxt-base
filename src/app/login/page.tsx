@@ -3,6 +3,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LogIn, UserPlus } from 'lucide-react'
 
+/**
+ * LoginPage Component
+ * 
+ * Renders the authentication interface for the application.
+ * Provides a form for users to enter their email and password to either
+ * log into an existing account or sign up for a new one. It uses Server
+ * Actions for form submission.
+ * 
+ * @returns React Server Component for the login and signup functionality.
+ */
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">

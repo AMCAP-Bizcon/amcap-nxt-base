@@ -5,6 +5,15 @@ import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LogIn, LogOut, Home } from 'lucide-react'
 
+/**
+ * Navbar Component
+ * 
+ * Renders the global navigation bar across the application.
+ * It conditionally displays user information and a logout button if the user
+ * is authenticated, or a login link if they are not. It also includes a theme toggle.
+ * 
+ * @returns React Server Component for the application header navigation.
+ */
 export default async function Navbar() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

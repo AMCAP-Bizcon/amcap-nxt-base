@@ -12,6 +12,16 @@ export const metadata: Metadata = {
   description: "Amcap's Production ready Saas stack",
 };
 
+/**
+ * RootLayout Component
+ * 
+ * The top-level foundational layout wrapper for the entire Next.js application.
+ * Bootstraps the HTML document with styling providers, the global Navbar, and Footer.
+ * It manages the structural flex layout so the main content expands correctly.
+ * 
+ * @param {Readonly<{children: React.ReactNode}>} props - Contains the active page content
+ * @returns React Server Component providing the global HTML structure.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

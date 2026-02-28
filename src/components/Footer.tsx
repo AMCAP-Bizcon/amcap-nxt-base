@@ -1,5 +1,13 @@
 import Link from "next/link";
 
+/**
+ * Footer Component
+ * 
+ * Renders the global footer section at the bottom of the application.
+ * Displays static company information, copyright details, and external links.
+ * 
+ * @returns React Server Component for the application footer.
+ */
 export default function Footer() {
     const currentYear = new Date().getFullYear();
 

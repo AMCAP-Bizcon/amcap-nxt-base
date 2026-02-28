@@ -15,6 +15,18 @@ export const config = {
   ],
 }
 
+/**
+ * Next.js Middleware (Proxy)
+ * 
+ * Intercepts requests to enforce route protection and refresh Supabase auth sessions.
+ * 
+ * 1. Initializes a Supabase Server Client using the current request/response cookies.
+ * 2. Fetches the current user to refresh their session proactively.
+ * 3. Bouncer Logic: Secures the `/todo` route by redirecting unauthenticated users to `/login`.
+ * 
+ * @param {NextRequest} request - The incoming HTTP request
+ * @returns {Promise<NextResponse>} The outgoing HTTP response (or redirect)
+ */
 export default async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: {

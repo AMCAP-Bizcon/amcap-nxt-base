@@ -31,6 +31,56 @@ type Todo = {
     createdAt: Date
 }
 
+/**
+ * AutoResizeTextarea Component
+ * 
+ * A reusable textarea component that automatically adjusts its height based on content.
+ * Extracted to avoid inline ref callbacks which cause unnecessary React re-renders.
+ */
+function AutoResizeTextarea({
+    value,
+    onChange,
+    placeholder,
+    className,
+    autoFocus,
+    onKeyDown
+}: {
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    placeholder?: string;
+    className?: string;
+    autoFocus?: boolean;
+    onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+}) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [value]);
+
+    return (
+        <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            className={className}
+            rows={1}
+            autoFocus={autoFocus}
+            onKeyDown={onKeyDown}
+        />
+    );
+}
+
+/**
+ * SortableItem Component
+ * 
+ * Represents an individual todo item that can be dragged and dropped.
+ * Handles display, editing, and selection states for each item.
+ */
 function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, onStartEdit, onTextChange, isSelectable, isSelected, onSelectToggle }: { id: number, todo: Todo, isReordering: boolean, isEditing: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void }) {
     const {
         attributes,
@@ -63,17 +113,10 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
             )}
             <div className={`flex flex-col gap-1 w-full ${isEditing ? 'cursor-pointer' : ''}`} onClick={() => { if (isEditing) onStartEdit(id) }}>
                 {isCurrentlyEditing ? (
-                    <textarea
-                        ref={(el) => {
-                            if (el) {
-                                el.style.height = 'auto';
-                                el.style.height = el.scrollHeight + 'px';
-                            }
-                        }}
+                    <AutoResizeTextarea
                         value={todo.text}
                         onChange={(e) => onTextChange(id, e.target.value)}
                         className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 resize-none overflow-hidden"
-                        rows={1}
                         autoFocus
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
@@ -92,7 +135,13 @@ function SortableItem({ id, todo, isReordering, isEditing, isCurrentlyEditing, o
     )
 }
 
-
+/**
+ * TodoList Component
+ * 
+ * Main client component for managing the list of todos.
+ * Handles state management, optimistic UI updates, keyboard shortcuts,
+ * and drag-and-drop integration using dnd-kit.
+ */
 export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     const [todos, setTodos] = useState(initialTodos)
     const [mode, setMode] = useState<'idle' | 'reordering' | 'editing' | 'done' | 'delete' | 'creating'>('idle')
@@ -101,9 +150,23 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
     const [isSaving, setIsSaving] = useState(false)
     const [newTodoText, setNewTodoText] = useState('')
 
+    // We use this ref to know when we've requested an update and shouldn't
+    // revert the UI to the older `initialTodos` prematurely.
+    const pendingUpdate = useRef(false)
+
     useEffect(() => {
-        if (mode === 'idle') {
+        // If we have an update pending (we just saved), don't immediately revert
+        // to `initialTodos`. Wait for the `initialTodos` to actually change (which Next.js handles via revalidatePath).
+        if (!pendingUpdate.current) {
             setTodos(initialTodos)
+        }
+
+        // Reset the flag if the initialTodos actually matches our latest state length or we were just creating
+        if (mode === 'idle') {
+            pendingUpdate.current = false;
+        }
+
+        if (mode === 'idle') {
             setNewTodoText('')
         }
     }, [initialTodos, mode])
@@ -134,11 +197,14 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
 
     const handleSave = async () => {
         setIsSaving(true)
+        pendingUpdate.current = true // Lock the UI state so it doesn't flicker back to old props
+
         try {
             if (mode === 'creating') {
                 if (newTodoText.trim()) {
+                    // Optimistic update for creation is tricky without a real ID, 
+                    // we'll just let the server return it quickly, but keep the UI locked.
                     await createTodo(newTodoText.trim())
-                    // Refresh is handled by Next.js revalidatePath which updates initialTodos
                 }
             } else if (mode === 'reordering') {
                 const updates = todos.map((todo, index) => ({
@@ -161,25 +227,29 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                 }
             } else if (mode === 'done') {
                 if (selectedTodoIds.length > 0) {
-                    await toggleTodosDoneStatus(selectedTodoIds)
-                    // Optimistic update handled by invalidation or state change
+                    // Optimistic update
                     setTodos(todos.map(t => selectedTodoIds.includes(t.id) ? { ...t, done: !t.done } : t))
+                    await toggleTodosDoneStatus(selectedTodoIds)
                 }
             } else if (mode === 'delete') {
                 if (selectedTodoIds.length > 0) {
-                    await deleteMultipleTodos(selectedTodoIds)
                     // Optimistic update
                     setTodos(todos.filter(t => !selectedTodoIds.includes(t.id)))
+                    await deleteMultipleTodos(selectedTodoIds)
                 }
             }
+
             setMode('idle')
             setEditingTodoId(null)
             setSelectedTodoIds([])
         } catch (error) {
+            pendingUpdate.current = false // Unlock if failed
             console.error("Failed to save", error)
             // Ideally add a toast notification here
         } finally {
             setIsSaving(false)
+            // We do NOT set pendingUpdate.current = false here immediately.
+            // We let the useEffect handle it once mode is idle and initialTodos updates.
         }
     }
 
@@ -236,7 +306,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
 
     return (
         <div className="w-full">
-            {/* The Mini Toolbar */}
+            {/* Toolbar */}
             <div className={`grid gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2'}`}>
                 {mode === 'idle' ? (
                     <>
@@ -292,18 +362,11 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                         {mode === 'creating' && (
                             <li className="p-4 border border-primary/50 shadow-md rounded-md bg-card text-card-foreground flex gap-3 items-center transition-colors">
                                 <div className="flex flex-col gap-1 w-full relative">
-                                    <textarea
-                                        ref={(el) => {
-                                            if (el) {
-                                                el.style.height = 'auto';
-                                                el.style.height = el.scrollHeight + 'px';
-                                            }
-                                        }}
+                                    <AutoResizeTextarea
                                         value={newTodoText}
                                         onChange={(e) => setNewTodoText(e.target.value)}
                                         placeholder="What needs to be done?"
                                         className="bg-transparent border-b border-primary outline-none font-medium px-1 -mx-1 py-1 resize-none overflow-hidden"
-                                        rows={1}
                                         autoFocus
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
