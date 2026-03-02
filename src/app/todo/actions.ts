@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
-import { todos, type Todo } from '@/db/schema'
+import { todos, todoRelationships, type Todo } from '@/db/schema'
 import { requireUser, createClient } from '@/utils/supabase/server'
 
 /**
@@ -41,7 +41,7 @@ async function deleteAssociatedMedia(supabase: any, todosToDelete: Pick<Todo, 'i
         await supabase.storage.from('todo-media').remove(pathsToDelete);
     }
 }
-import { eq, and, inArray, sql } from 'drizzle-orm'
+import { eq, and, or, inArray, sql } from 'drizzle-orm'
 
 /**
  * Creates a new Todo item for the currently authenticated user.
@@ -64,14 +64,16 @@ export async function createTodo(text: string) {
     const newSequence = result?.minSeq !== null ? Number(result.minSeq) - 1 : 0
 
     // 2. Insert into the database via Drizzle at the first position
-    await db.insert(todos).values({
+    const [newTodo] = await db.insert(todos).values({
         text: text,
         userId: user.id,
         sequence: newSequence,
-    })
+    }).returning()
 
     // 3. Tell Next.js to refresh the dashboard page to show the new data
     revalidatePath('/todo')
+
+    return newTodo
 }
 
 /**
@@ -211,10 +213,10 @@ export async function deleteMultipleTodos(ids: number[]) {
  * Updates the details of a specific Todo item.
  * 
  * @param {number} id - The ID of the Todo item
- * @param {Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files' | 'parentId'>>} details - The fields to update
+ * @param {Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files'>>} details - The fields to update
  * @throws {Error} If the user is unauthenticated
  */
-export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files' | 'parentId'>>) {
+export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files'>>) {
     // 1. Verify who is making the request
     const user = await requireUser()
     const supabase = await createClient()
@@ -269,4 +271,73 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
 
     // 4. Refresh the todo page data
     revalidatePath('/todo')
+}
+
+/**
+ * Updates the parent and child relationships for a specific Todo.
+ * Uses a Postgres Recursive CTE to correctly validate cycle dependencies.
+ * 
+ * @param {number} todoId - The ID of the Todo being updated
+ * @param {number[]} parentIds - The IDs of all its parents
+ * @param {number[]} childIds - The IDs of all its children
+ * @throws {Error} If updating would create a cycle or user is unauthenticated
+ */
+export async function updateTodoRelationships(todoId: number, parentIds: number[], childIds: number[]) {
+    // 1. Verify who is making the request
+    const user = await requireUser()
+
+    await db.transaction(async (tx) => {
+        // 1. Delete all existing relationships involving this todoId
+        // Either where parentId = todoId OR childId = todoId
+        await tx.delete(todoRelationships).where(
+            and(
+                eq(todoRelationships.userId, user.id),
+                or(
+                    eq(todoRelationships.parentId, todoId),
+                    eq(todoRelationships.childId, todoId)
+                )
+            )
+        );
+
+        // 2. Insert the new ones
+        const newEdges: { parentId: number; childId: number; userId: string }[] = [];
+
+        for (const p of parentIds) {
+            newEdges.push({ parentId: p, childId: todoId, userId: user.id });
+        }
+        for (const c of childIds) {
+            newEdges.push({ parentId: todoId, childId: c, userId: user.id });
+        }
+
+        if (newEdges.length > 0) {
+            await tx.insert(todoRelationships).values(newEdges);
+        }
+
+        // 3. Cycle validation via Recursive CTE
+        // If there's a cycle, the graph now contains a path from todoId back to todoId.
+        const cycleCheck = await tx.execute(sql`
+            WITH RECURSIVE search_graph(child_id) AS (
+                -- Base case: children of todoId
+                SELECT child_id
+                FROM todo_relationships
+                WHERE parent_id = ${todoId} AND user_id = ${user.id}
+                
+                UNION
+                
+                -- Recursive step: children of the current nodes
+                SELECT r.child_id
+                FROM todo_relationships r
+                INNER JOIN search_graph sg ON r.parent_id = sg.child_id
+                WHERE r.user_id = ${user.id}
+            )
+            SELECT 1 FROM search_graph WHERE child_id = ${todoId} LIMIT 1;
+        `);
+
+        if (cycleCheck.length > 0) {
+            tx.rollback();
+            throw new Error("Cannot save relationships: circular dependency detected.");
+        }
+    });
+
+    revalidatePath('/todo');
 }

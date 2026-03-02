@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { todos } from '@/db/schema'
+import { todos, todoRelationships } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
 import { createTodo } from './actions'
@@ -19,9 +19,14 @@ export default async function ToDoPage() {
         .where(eq(todos.userId, user!.id))
         .orderBy(todos.sequence, todos.createdAt)
 
+    const userRelationships = await db
+        .select()
+        .from(todoRelationships)
+        .where(eq(todoRelationships.userId, user!.id))
+
     return (
         <div className="flex justify-center p-8 w-full flex-1 min-h-0">
-            <TodoList initialTodos={userTodos} />
+            <TodoList initialTodos={userTodos} initialRelationships={userRelationships} />
         </div>
     )
 }

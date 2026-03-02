@@ -29,7 +29,7 @@ import {
     ResizablePanelGroup,
 } from "@/components/ui/resizable"
 
-import { type Todo } from '@/db/schema'
+import { type Todo, type TodoRelationship } from '@/db/schema'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 
 /**
@@ -99,8 +99,9 @@ function SortableItem({ id, todo, isReordering, isEditing, isIdle, isCurrentlyEd
  * Handles state management, optimistic UI updates, keyboard shortcuts,
  * and drag-and-drop integration using dnd-kit.
  */
-export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
+export function TodoList({ initialTodos, initialRelationships }: { initialTodos: Todo[], initialRelationships: TodoRelationship[] }) {
     const [todos, setTodos] = useState(initialTodos)
+    const [relationships, setRelationships] = useState(initialRelationships)
     const [mode, setMode] = useState<'idle' | 'reordering' | 'editing' | 'done' | 'delete' | 'creating'>('idle')
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null)
     const [selectedDetailsTodoId, setSelectedDetailsTodoId] = useState<number | null>(null)
@@ -126,6 +127,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         // to `initialTodos`. Wait for the `initialTodos` to actually change (which Next.js handles via revalidatePath).
         if (!pendingUpdate.current) {
             setTodos(initialTodos)
+            setRelationships(initialRelationships)
         }
 
         // Reset the flag if the initialTodos actually matches our latest state length or we were just creating
@@ -136,7 +138,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
         if (mode === 'idle') {
             setNewTodoText('')
         }
-    }, [initialTodos, mode])
+    }, [initialTodos, initialRelationships, mode])
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -403,6 +405,7 @@ export function TodoList({ initialTodos }: { initialTodos: Todo[] }) {
                                 ref={detailsPanelRef}
                                 todo={todos.find(t => t.id === selectedDetailsTodoId) || null}
                                 allTodos={todos}
+                                relationships={relationships}
                                 onClose={() => setSelectedDetailsTodoId(null)}
                                 onSaved={() => {
                                     // Handled automatically via Next.js revalidatePath from server action

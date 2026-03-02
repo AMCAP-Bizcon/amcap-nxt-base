@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { type Todo } from '@/db/schema'
+import { type Todo, type TodoRelationship } from '@/db/schema'
 import { Button } from '@/components/ui/button'
 import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon } from 'lucide-react'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { updateTodoDetails } from './actions'
+import { updateTodoDetails, updateTodoRelationships } from './actions'
 import { createClient } from '@/utils/supabase/client'
+import { RelationshipSubList } from './RelationshipSubList'
 
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 
 export interface TodoDetailsPanelRef {
     handleSave: () => Promise<void>;
@@ -21,57 +22,105 @@ export interface TodoDetailsPanelRef {
 interface TodoDetailsPanelProps {
     todo: Todo | null
     allTodos: Todo[]
+    relationships: TodoRelationship[]
     onClose: () => void
     onSaved: () => void
 }
 
-export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, onClose, onSaved }, ref) => {
+export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, onClose, onSaved }, ref) => {
     const [isSaving, setIsSaving] = useState(false)
     const [details, setDetails] = useState<{
         description: string;
         images: string[];
         files: { name: string, url: string }[];
-        parentId: number | null;
-    }>({ description: '', images: [], files: [], parentId: null })
+        parentIds: number[];
+        childIds: number[];
+    }>({ description: '', images: [], files: [], parentIds: [], childIds: [] })
 
     const [isUploading, setIsUploading] = useState(false)
     const imageInputRef = useRef<HTMLInputElement>(null)
     const captureInputRef = useRef<HTMLInputElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const currentTodoId = useRef<number | null>(null)
 
     const supabase = createClient()
 
-    // Reset local state when todo changes
     useEffect(() => {
-        if (todo) {
+        if (todo && todo.id !== currentTodoId.current) {
+            currentTodoId.current = todo.id;
             setDetails({
                 description: todo.description || '',
                 images: Array.isArray(todo.images) ? todo.images : [],
                 files: Array.isArray(todo.files) ? todo.files : [],
-                parentId: todo.parentId,
+                parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
+                childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
             })
         }
-    }, [todo])
+    }, [todo, relationships])
 
     if (!todo) return null
 
     const handleSave = async () => {
         setIsSaving(true)
         try {
-            await updateTodoDetails(todo.id, {
-                description: details.description,
-                images: details.images,
-                files: details.files,
-                parentId: details.parentId,
-            })
+            await Promise.all([
+                updateTodoDetails(todo.id, {
+                    description: details.description,
+                    images: details.images,
+                    files: details.files,
+                }),
+                updateTodoRelationships(todo.id, details.parentIds, details.childIds)
+            ])
             onSaved()
             onClose()
         } catch (error) {
             console.error('Failed to save todo details', error)
+            alert(error instanceof Error ? error.message : "Failed to save details.")
         } finally {
             setIsSaving(false)
         }
     }
+
+    // Validate cyclic dependencies on the client-side
+    const allTodosMap = useMemo(() => new Map(allTodos.map(t => [t.id, t])), [allTodos]);
+
+    const simulatedGraph = useMemo(() => {
+        if (!todo) return [];
+        let graph = relationships.filter(r => r.childId !== todo.id && r.parentId !== todo.id);
+        details.parentIds.forEach(pId => graph.push({ parentId: pId, childId: todo.id, userId: '' }));
+        details.childIds.forEach(cId => graph.push({ parentId: todo.id, childId: cId, userId: '' }));
+        return graph;
+    }, [details, relationships, todo]);
+
+    const getDescendants = (startId: number) => {
+        const desc = new Set<number>();
+        const queue = [startId];
+        while (queue.length > 0) {
+            const curr = queue.shift()!;
+            for (const r of simulatedGraph) {
+                if (r.parentId === curr && !desc.has(r.childId)) {
+                    desc.add(r.childId);
+                    queue.push(r.childId);
+                }
+            }
+        }
+        return desc;
+    }
+
+    const availableParents = useMemo(() => {
+        if (!todo) return [];
+        const desc = getDescendants(todo.id);
+        return allTodos.filter(t => t.id !== todo.id && !desc.has(t.id));
+    }, [allTodos, todo, simulatedGraph]);
+
+    const availableChildren = useMemo(() => {
+        if (!todo) return [];
+        return allTodos.filter(t => {
+            if (t.id === todo.id) return false;
+            const desc = getDescendants(t.id);
+            return !desc.has(todo.id); // Valid child if it cannot reach back to `todo`
+        });
+    }, [allTodos, todo, simulatedGraph]);
 
     const removeImage = (index: number) => {
         setDetails(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }))
@@ -161,7 +210,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         <div className="w-full h-full bg-card border-l border-border flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border shadow-sm flex-shrink-0">
-                <h2 className="text-xl font-semibold tracking-tight">Todo Details</h2>
+                <h2 className="text-xl font-semibold tracking-tight">{todo.text}</h2>
                 <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                     <X className="h-5 w-5" />
                     <span className="sr-only">Close</span>
@@ -170,12 +219,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                {/* Read-only Title */}
-                <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Title</label>
-                    <p className="text-lg font-medium bg-muted/50 p-3 rounded-md border border-border/50">{todo.text}</p>
-                </div>
-
                 {/* Description */}
                 <div>
                     <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Description</label>
@@ -186,21 +229,22 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     />
                 </div>
 
-                {/* Parent Selector */}
-                <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-1.5 flex items-center gap-2">
-                        <LinkIcon className="h-4 w-4" /> Parent Todo
-                    </label>
-                    <select
-                        value={details.parentId || ''}
-                        onChange={(e) => setDetails({ ...details, parentId: e.target.value ? Number(e.target.value) : null })}
-                        className="bg-background border border-input text-foreground text-sm rounded-md px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow placeholder:text-muted-foreground"
-                    >
-                        <option value="">None</option>
-                        {allTodos.filter(t => t.id !== todo.id).map(t => (
-                            <option key={t.id} value={t.id}>{t.text}</option>
-                        ))}
-                    </select>
+                {/* Parents/Children Relationship Selectors */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <RelationshipSubList
+                        title="Parent Todos"
+                        linkedIds={details.parentIds}
+                        availableTodos={availableParents}
+                        allTodosMap={allTodosMap}
+                        onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
+                    />
+                    <RelationshipSubList
+                        title="Child Todos"
+                        linkedIds={details.childIds}
+                        availableTodos={availableChildren}
+                        allTodosMap={allTodosMap}
+                        onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, childIds: newIds }))}
+                    />
                 </div>
 
                 {/* Images List */}
