@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle, PlusCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
     DndContext,
     closestCenter,
@@ -109,6 +110,7 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
     const [isSaving, setIsSaving] = useState(false)
     const [newTodoText, setNewTodoText] = useState('')
     const [isMobile, setIsMobile] = useState(false)
+    const [detailsMode, setDetailsMode] = useState<'idle' | 'editing'>('idle')
     const detailsPanelRef = useRef<TodoDetailsPanelRef>(null)
 
     useEffect(() => {
@@ -277,23 +279,38 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
         <div className={`w-full flex flex-col max-h-full transition-all duration-300 ease-in-out ${selectedDetailsTodoId ? 'max-w-full' : 'max-w-2xl'}`}>
             {/* Toolbar */}
             {selectedDetailsTodoId ? (
-                <div className="grid shrink-0 gap-3 mb-8 w-full grid-cols-4">
-                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddImage()} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-2 sm:px-3">
-                        <ImageIcon className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                        <span className="hidden sm:inline">Add Image</span>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptCaptureImage()} className="w-full h-11 text-pink-600 hover:text-pink-700 hover:bg-pink-50 hover:shadow-glow-pink-sm px-2 sm:px-3">
-                        <Camera className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                        <span className="hidden sm:inline">Capture</span>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddFile()} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-2 sm:px-3">
-                        <FileText className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                        <span className="hidden sm:inline">Add File</span>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.handleSave()} disabled={detailsPanelRef.current?.isSaving} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-2 sm:px-3">
-                        <Save className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                        <span className="hidden sm:inline">{detailsPanelRef.current?.isSaving ? 'Saving...' : 'Save Details'}</span>
-                    </Button>
+                <div className={`grid shrink-0 gap-3 mb-8 w-full ${detailsMode === 'idle' ? 'grid-cols-4' : 'grid-cols-2'}`}>
+                    {detailsMode === 'idle' ? (
+                        <>
+                            <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddImage()} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-2 sm:px-3">
+                                <ImageIcon className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Add Image</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptCaptureImage()} className="w-full h-11 text-pink-600 hover:text-pink-700 hover:bg-pink-50 hover:shadow-glow-pink-sm px-2 sm:px-3">
+                                <Camera className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Capture</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.promptAddFile()} className="w-full h-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-2 sm:px-3">
+                                <FileText className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Add File</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setDetailsMode('editing')} className="w-full h-11 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-2 sm:px-3">
+                                <Edit2 className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Edit Details</span>
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" size="sm" onClick={() => { detailsPanelRef.current?.handleDiscard(); setDetailsMode('idle') }} disabled={detailsPanelRef.current?.isSaving} className="w-full h-11 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50 px-2 sm:px-3">
+                                <XCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">Discard (Esc)</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => detailsPanelRef.current?.handleSave()} disabled={detailsPanelRef.current?.isSaving} className="w-full h-11 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50 px-2 sm:px-3">
+                                <Save className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                <span className="hidden sm:inline">{detailsPanelRef.current?.isSaving ? 'Saving...' : 'Save (Enter)'}</span>
+                            </Button>
+                        </>
+                    )}
                 </div>
             ) : (
                 <div className={`grid shrink-0 gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-5' : 'grid-cols-2'}`}>
@@ -333,12 +350,13 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                         </>
                     )}
                 </div>
-            )}
+            )
+            }
 
             <ResizablePanelGroup orientation={isMobile ? "vertical" : "horizontal"} className={`w-full flex-initial items-stretch rounded-lg border border-border bg-card/50 ${modeStyles[mode].shadow} transition-shadow duration-300 ease-out overflow-hidden ${isMobile ? 'min-h-[400px]' : 'min-h-[100px]'}`}>
 
                 {/* Left Panel: The List */}
-                <ResizablePanel defaultSize={selectedDetailsTodoId ? 20 : 100} minSize={30} className="transition-all duration-300 ease-in-out h-full flex flex-col">
+                <ResizablePanel defaultSize={selectedDetailsTodoId ? 20 : 100} minSize={30} className={cn("transition-all duration-300 ease-in-out h-full flex flex-col", detailsMode === 'editing' ? 'pointer-events-none opacity-50' : '')}>
                     <div className="flex-1 overflow-y-auto p-4 pr-2 min-h-0">
                         <DndContext
                             sensors={sensors}
@@ -406,8 +424,11 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                                 todo={todos.find(t => t.id === selectedDetailsTodoId) || null}
                                 allTodos={todos}
                                 relationships={relationships}
-                                onClose={() => setSelectedDetailsTodoId(null)}
+                                readOnly={detailsMode === 'idle'}
+                                onEnterEditMode={() => setDetailsMode('editing')}
+                                onClose={() => { setSelectedDetailsTodoId(null); setDetailsMode('idle'); }}
                                 onSaved={() => {
+                                    setDetailsMode('idle');
                                     // Handled automatically via Next.js revalidatePath from server action
                                 }}
                             />
@@ -415,6 +436,6 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                     </>
                 )}
             </ResizablePanelGroup>
-        </div>
+        </div >
     )
 }

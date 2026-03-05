@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import { type Todo } from '@/db/schema'
 import { Button } from '@/components/ui/button'
-import { CheckSquare, Trash2, Edit2, Save, XCircle, PlusCircle, Check, ChevronsUpDown } from 'lucide-react'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { CheckSquare, Trash2, Edit2, Save, XCircle, PlusCircle, Check } from 'lucide-react'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
@@ -15,16 +14,16 @@ interface RelationshipSubListProps {
     linkedIds: number[];
     availableTodos: Todo[];
     allTodosMap: Map<number, Todo>;
+    readOnly?: boolean;
     onLinksChanged: (newIds: number[]) => void;
 }
 
-export function RelationshipSubList({ title, linkedIds, availableTodos, allTodosMap, onLinksChanged }: RelationshipSubListProps) {
+export function RelationshipSubList({ title, linkedIds, availableTodos, allTodosMap, readOnly = false, onLinksChanged }: RelationshipSubListProps) {
     const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete'>('idle')
     const [selectedIds, setSelectedIds] = useState<number[]>([])
     const [newTodoText, setNewTodoText] = useState('')
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null)
     const [isSaving, setIsSaving] = useState(false)
-    const [openDropdown, setOpenDropdown] = useState(false)
 
     // We maintain a local copy of "linkedIds" array from Props
     const [localLinkedIds, setLocalLinkedIds] = useState(linkedIds)
@@ -111,78 +110,70 @@ export function RelationshipSubList({ title, linkedIds, availableTodos, allTodos
                 {title}
             </label>
 
-            <Popover open={openDropdown} onOpenChange={setOpenDropdown}>
-                <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" aria-expanded={openDropdown} className="w-full justify-between" disabled={mode !== 'idle'}>
-                        Search mapped {title.toLowerCase()}...
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                    <Command>
-                        <CommandInput placeholder="Search..." />
-                        <CommandList>
-                            <CommandEmpty>No matching todos found.</CommandEmpty>
-                            <CommandGroup>
-                                {availableTodos.filter(t => !localLinkedIds.includes(t.id)).map((todo) => (
-                                    <CommandItem
-                                        key={todo.id}
-                                        value={todo.id.toString() + " " + todo.text}
-                                        onSelect={() => {
-                                            const newIds = [...localLinkedIds, todo.id];
-                                            setLocalLinkedIds(newIds);
-                                            onLinksChanged(newIds);
-                                            setOpenDropdown(false);
-                                        }}
-                                    >
-                                        <Check className={cn("mr-2 h-4 w-4", localLinkedIds.includes(todo.id) ? "opacity-100" : "opacity-0")} />
-                                        <span className="truncate">{todo.text}</span>
-                                    </CommandItem>
-                                ))}
-                            </CommandGroup>
-                        </CommandList>
-                    </Command>
-                </PopoverContent>
-            </Popover>
-
-            <div className="flex gap-2 w-full mt-1">
-                {mode === 'idle' ? (
-                    <>
-                        <Button variant="outline" size="icon" onClick={() => setMode('creating')} className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm">
-                            <PlusCircle className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => setMode('editing')} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm">
-                            <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm">
-                            <CheckSquare className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm">
-                            <Trash2 className="w-4 h-4" />
-                        </Button>
-                    </>
-                ) : (
-                    <>
-                        <Button variant="outline" size="icon" onClick={handleDiscard} disabled={isSaving} className="text-slate-500 hover:bg-slate-50 hover:shadow-glow-slate-sm">
-                            <XCircle className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={handleSave} disabled={isSaving} className="text-sky-600 hover:bg-sky-50 hover:shadow-glow-sky-sm">
-                            <Save className="w-4 h-4" />
-                        </Button>
-                    </>
-                )}
-            </div>
+            {!readOnly && (
+                <div className="flex gap-2 w-full mt-1">
+                    {mode === 'idle' ? (
+                        <>
+                            <Button variant="outline" size="icon" onClick={() => setMode('creating')} className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm">
+                                <PlusCircle className="w-4 h-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => setMode('editing')} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm">
+                                <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => setMode('done')} className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm">
+                                <CheckSquare className="w-4 h-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => setMode('delete')} className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm">
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" size="icon" onClick={handleDiscard} disabled={isSaving} className="text-slate-500 hover:bg-slate-50 hover:shadow-glow-slate-sm">
+                                <XCircle className="w-4 h-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={handleSave} disabled={isSaving} className="text-sky-600 hover:bg-sky-50 hover:shadow-glow-sky-sm">
+                                <Save className="w-4 h-4" />
+                            </Button>
+                        </>
+                    )}
+                </div>
+            )}
 
             <ul className={cn("space-y-2 mt-2 transition-all duration-300", mode !== 'idle' ? `p-2 border rounded-md ${modeStyles[mode]} bg-background/50` : "")}>
                 {mode === 'creating' && (
-                    <li className="p-2 border border-primary/50 rounded-md bg-card flex gap-2 items-center">
-                        <AutoResizeTextarea
-                            value={newTodoText}
-                            onChange={(e) => setNewTodoText(e.target.value)}
-                            placeholder="Type a new todo to add..."
-                            className="bg-transparent outline-none font-medium px-1 -mx-1 py-1 resize-none w-full"
-                            autoFocus
-                        />
+                    <li className="p-0 border border-primary/50 rounded-md bg-card flex flex-col overflow-hidden shadow-sm">
+                        <Command className="w-full bg-transparent p-0">
+                            <CommandInput
+                                placeholder={`Search or type to create new ${title.toLowerCase()}...`}
+                                value={newTodoText}
+                                onValueChange={setNewTodoText}
+                                autoFocus
+                            />
+                            <CommandList>
+                                <CommandEmpty className="py-2 text-center text-sm text-muted-foreground">
+                                    No matched {title.toLowerCase()}. Press Save to create a new one.
+                                </CommandEmpty>
+                                <CommandGroup>
+                                    {availableTodos.filter(t => !localLinkedIds.includes(t.id)).map((todo) => (
+                                        <CommandItem
+                                            key={todo.id}
+                                            value={todo.id.toString() + " " + todo.text}
+                                            onSelect={() => {
+                                                const newIds = [...localLinkedIds, todo.id];
+                                                setLocalLinkedIds(newIds);
+                                                onLinksChanged(newIds);
+                                                setMode('idle');
+                                                setNewTodoText('');
+                                            }}
+                                        >
+                                            <Check className={cn("mr-2 h-4 w-4", localLinkedIds.includes(todo.id) ? "opacity-100" : "opacity-0")} />
+                                            <span className="truncate">{todo.text}</span>
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
                     </li>
                 )}
                 {localTodos.length === 0 && mode !== 'creating' && (
@@ -195,7 +186,7 @@ export function RelationshipSubList({ title, linkedIds, availableTodos, allTodos
                     const isCurrentlyEditing = editingTodoId === todo.id;
 
                     return (
-                        <li key={todo.id} className={cn("p-2 border border-border rounded-md bg-card text-sm flex gap-2 items-center transition-colors", isEditing ? 'hover:border-primary/50 cursor-pointer' : '')}>
+                        <li key={todo.id} className={cn("p-2 border border-border rounded-md bg-card text-sm flex gap-2 items-center transition-colors", isEditing ? 'hover:border-primary/50 cursor-pointer' : '', readOnly && 'opacity-80 cursor-default')}>
                             {isSelectable && (
                                 <input
                                     type="checkbox"

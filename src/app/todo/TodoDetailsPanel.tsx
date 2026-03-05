@@ -13,6 +13,7 @@ import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 
 export interface TodoDetailsPanelRef {
     handleSave: () => Promise<void>;
+    handleDiscard: () => void;
     promptAddImage: () => void;
     promptCaptureImage: () => void;
     promptAddFile: () => void;
@@ -23,11 +24,13 @@ interface TodoDetailsPanelProps {
     todo: Todo | null
     allTodos: Todo[]
     relationships: TodoRelationship[]
+    readOnly?: boolean
+    onEnterEditMode?: () => void
     onClose: () => void
     onSaved: () => void
 }
 
-export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, onClose, onSaved }, ref) => {
+export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, readOnly = false, onEnterEditMode, onClose, onSaved }, ref) => {
     const [isSaving, setIsSaving] = useState(false)
     const [details, setDetails] = useState<{
         description: string;
@@ -42,6 +45,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const captureInputRef = useRef<HTMLInputElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const currentTodoId = useRef<number | null>(null)
+    const [activeRelationshipTab, setActiveRelationshipTab] = useState<'parents' | 'children'>('parents')
 
     const supabase = createClient()
 
@@ -72,7 +76,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 updateTodoRelationships(todo.id, details.parentIds, details.childIds)
             ])
             onSaved()
-            onClose()
         } catch (error) {
             console.error('Failed to save todo details', error)
             alert(error instanceof Error ? error.message : "Failed to save details.")
@@ -138,6 +141,17 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
     useImperativeHandle(ref, () => ({
         handleSave,
+        handleDiscard: () => {
+            if (todo) {
+                setDetails({
+                    description: todo.description || '',
+                    images: Array.isArray(todo.images) ? todo.images : [],
+                    files: Array.isArray(todo.files) ? todo.files : [],
+                    parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
+                    childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
+                });
+            }
+        },
         promptAddImage: () => {
             imageInputRef.current?.click();
         },
@@ -168,6 +182,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             const { data } = supabase.storage.from('todo-media').getPublicUrl(fileName);
 
             setDetails(prev => ({ ...prev, images: [...prev.images, data.publicUrl] }));
+            if (readOnly) onEnterEditMode?.()
         } catch (error) {
             console.error('Failed to upload image:', error);
             alert('Failed to upload image. Please try again.');
@@ -197,6 +212,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             const { data } = supabase.storage.from('todo-media').getPublicUrl(fileName);
 
             addFile(originalName, data.publicUrl);
+            if (readOnly) onEnterEditMode?.()
         } catch (error) {
             console.error('Failed to upload file:', error);
             alert('Failed to upload file. Please try again.');
@@ -226,25 +242,47 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                         value={details.description}
                         onChange={(value) => setDetails({ ...details, description: value })}
                         placeholder="Add a more detailed description..."
+                        readOnly={readOnly}
                     />
                 </div>
 
                 {/* Parents/Children Relationship Selectors */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <RelationshipSubList
-                        title="Parent Todos"
-                        linkedIds={details.parentIds}
-                        availableTodos={availableParents}
-                        allTodosMap={allTodosMap}
-                        onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
-                    />
-                    <RelationshipSubList
-                        title="Child Todos"
-                        linkedIds={details.childIds}
-                        availableTodos={availableChildren}
-                        allTodosMap={allTodosMap}
-                        onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, childIds: newIds }))}
-                    />
+                <div>
+                    <div className="flex border-b border-border mb-4">
+                        <button
+                            type="button"
+                            onClick={() => setActiveRelationshipTab('parents')}
+                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeRelationshipTab === 'parents' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                            Parent Todos
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveRelationshipTab('children')}
+                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeRelationshipTab === 'children' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                            Child Todos
+                        </button>
+                    </div>
+                    {activeRelationshipTab === 'parents' ? (
+                        <RelationshipSubList
+                            title="Parent Todos"
+                            linkedIds={details.parentIds}
+                            availableTodos={availableParents}
+                            allTodosMap={allTodosMap}
+                            readOnly={readOnly}
+                            onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
+                        />
+                    ) : (
+                        <RelationshipSubList
+                            title="Child Todos"
+                            linkedIds={details.childIds}
+                            availableTodos={availableChildren}
+                            allTodosMap={allTodosMap}
+                            readOnly={readOnly}
+                            onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, childIds: newIds }))}
+                        />
+                    )}
                 </div>
 
                 {/* Images List */}
@@ -257,9 +295,11 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                             {details.images.map((img, i) => (
                                 <div key={i} className="relative group rounded-md border border-border/50 overflow-hidden bg-muted aspect-video flex-shrink-0 shadow-sm">
                                     <img src={img} alt={`Attached ${i}`} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Invalid+Image' }} />
-                                    <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
-                                        <X className="h-3 w-3" />
-                                    </button>
+                                    {!readOnly && (
+                                        <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -276,9 +316,11 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                             {details.files.map((file, i) => (
                                 <li key={i} className="flex items-center justify-between p-2 rounded-md border border-border bg-muted/40 shadow-sm">
                                     <a href={file.url} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:underline truncate mr-2 block break-all font-medium transition-colors hover:text-blue-600">{file.name}</a>
-                                    <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive flex-shrink-0 p-1 hover:bg-destructive/10 rounded-full transition-colors">
-                                        <X className="h-4 w-4" />
-                                    </button>
+                                    {!readOnly && (
+                                        <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive flex-shrink-0 p-1 hover:bg-destructive/10 rounded-full transition-colors">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    )}
                                 </li>
                             ))}
                         </ul>

@@ -2,11 +2,7 @@ import { db } from '@/db'
 import { todos, todoRelationships } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
-import { createTodo } from './actions'
 import { TodoList } from './TodoList'
-
-// Force Next.js / Vercel to invalidate the build cache for this route
-export const dynamic = 'force-dynamic'
 
 export default async function ToDoPage() {
     // 1. Get the current user

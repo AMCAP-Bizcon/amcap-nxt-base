@@ -11,6 +11,7 @@ interface RichTextEditorProps {
     onChange: (value: string) => void
     placeholder?: string
     className?: string
+    readOnly?: boolean
 }
 
 const MenuBar = ({ editor }: { editor: any }) => {
@@ -119,9 +120,10 @@ const MenuBar = ({ editor }: { editor: any }) => {
 /**
  * A Tailwind-styled rich text editor powered by Tiptap.
  */
-export function RichTextEditor({ value, onChange, placeholder, className }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder, className, readOnly = false }: RichTextEditorProps) {
     const editor = useEditor({
         immediatelyRender: false,
+        editable: !readOnly,
         extensions: [
             StarterKit.configure({
                 heading: {
@@ -156,10 +158,16 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Rich
         }
     }, [value, editor])
 
+    React.useEffect(() => {
+        if (editor) {
+            editor.setOptions({ editable: !readOnly })
+        }
+    }, [editor, readOnly])
+
     return (
-        <div className={cn("w-full bg-background border border-input rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-shadow", className)}>
-            <MenuBar editor={editor} />
-            <EditorContent editor={editor} className="cursor-text" onClick={() => editor?.chain().focus().run()} />
+        <div className={cn("w-full bg-background border border-input rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 transition-shadow", className, readOnly && "opacity-80 pointer-events-none")}>
+            {!readOnly && <MenuBar editor={editor} />}
+            <EditorContent editor={editor} className="cursor-text" onClick={() => !readOnly && editor?.chain().focus().run()} />
         </div>
     )
 }
