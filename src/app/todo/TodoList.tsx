@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle, PlusCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -21,9 +21,9 @@ import {
     useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { updateTodoSequence, updateTodoTexts, toggleTodosDoneStatus, deleteMultipleTodos, createTodo } from './actions'
+import { updateTodoSequence, updateTodoTexts, toggleTodosDoneStatus, deleteMultipleTodos, createTodo, toggleTodoPin } from './actions'
 import { TodoDetailsPanel, type TodoDetailsPanelRef } from './TodoDetailsPanel'
-import { Image as ImageIcon, FileText, Camera } from 'lucide-react'
+import { Image as ImageIcon, FileText, Camera, Pin, PinOff, ArrowLeft } from 'lucide-react'
 import {
     ResizableHandle,
     ResizablePanel,
@@ -111,7 +111,29 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
     const [newTodoText, setNewTodoText] = useState('')
     const [isMobile, setIsMobile] = useState(false)
     const [detailsMode, setDetailsMode] = useState<'idle' | 'editing'>('idle')
+    const [listContext, setListContext] = useState<{type: 'children' | 'parents', id: number} | null>(null)
+    const [contextHistory, setContextHistory] = useState<({type: 'children' | 'parents', id: number} | null)[]>([])
     const detailsPanelRef = useRef<TodoDetailsPanelRef>(null)
+    
+    // Sort array based on sequence as drizzle might not guarantee it
+    const sortedTodos = useMemo(() => [...todos].sort((a,b) => a.sequence - b.sequence), [todos])
+
+    const displayTodos = useMemo(() => {
+        if (!listContext) {
+            // Root view: show todos that have no parents OR are pinned
+            const hasParents = new Set(relationships.map(r => r.childId));
+            return sortedTodos.filter(t => !hasParents.has(t.id) || t.isPinned);
+        } else if (listContext.type === 'children') {
+            // Drill down view: show children
+            const childIds = new Set(relationships.filter(r => r.parentId === listContext.id).map(r => r.childId));
+            return sortedTodos.filter(t => childIds.has(t.id));
+        } else if (listContext.type === 'parents') {
+            // Drill up view: show parents
+            const parentIds = new Set(relationships.filter(r => r.childId === listContext.id).map(r => r.parentId));
+            return sortedTodos.filter(t => parentIds.has(t.id));
+        }
+        return [];
+    }, [sortedTodos, relationships, listContext]);
 
     useEffect(() => {
         const checkIsMobile = () => setIsMobile(window.innerWidth < 768)
@@ -313,9 +335,19 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                     )}
                 </div>
             ) : (
-                <div className={`grid shrink-0 gap-3 mb-8 w-full ${mode === 'idle' ? 'grid-cols-5' : 'grid-cols-2'}`}>
+                <div className={`grid shrink-0 gap-3 mb-8 w-full ${mode === 'idle' ? (contextHistory.length > 0 ? 'grid-cols-6' : 'grid-cols-5') : 'grid-cols-2'}`}>
                     {mode === 'idle' ? (
                         <>
+                            {contextHistory.length > 0 && (
+                                <Button variant="outline" size="sm" onClick={() => {
+                                    const prev = contextHistory[contextHistory.length - 1];
+                                    setListContext(prev);
+                                    setContextHistory(h => h.slice(0, -1));
+                                }} className="w-full h-11 text-slate-600 hover:text-slate-700 hover:bg-slate-50 hover:shadow-glow-slate-sm px-2 sm:px-3">
+                                    <ArrowLeft className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                                    <span className="hidden sm:inline">Back</span>
+                                </Button>
+                            )}
                             <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="w-full h-11 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-2 sm:px-3">
                                 <PlusCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
                                 <span className="hidden sm:inline">Create</span>
@@ -364,7 +396,7 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                             onDragEnd={handleDragEnd}
                         >
                             <SortableContext
-                                items={todos.map(t => t.id)}
+                                items={displayTodos.map(t => t.id)}
                                 strategy={verticalListSortingStrategy}
                             >
                                 <ul className="space-y-3">
@@ -386,7 +418,7 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                                             </div>
                                         </li>
                                     )}
-                                    {todos.map((todo) => (
+                                    {displayTodos.map((todo) => (
                                         <SortableItem
                                             key={todo.id}
                                             id={todo.id}
@@ -403,7 +435,7 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                                             onSelectToggle={handleSelectToggle}
                                         />
                                     ))}
-                                    {todos.length === 0 && mode !== 'creating' && (
+                                    {displayTodos.length === 0 && mode !== 'creating' && (
                                         <p className="text-muted-foreground text-center mt-8 py-8 border-2 border-dashed border-border rounded-lg">
                                             No todos yet. Click &quot;Create&quot; to start!
                                         </p>
@@ -426,7 +458,16 @@ export function TodoList({ initialTodos, initialRelationships }: { initialTodos:
                                 relationships={relationships}
                                 readOnly={detailsMode === 'idle'}
                                 onEnterEditMode={() => setDetailsMode('editing')}
-                                onClose={() => { setSelectedDetailsTodoId(null); setDetailsMode('idle'); }}
+                                onClose={() => { setSelectedDetailsTodoId(null); setDetailsMode('idle'); setListContext(null); setContextHistory([]); }}
+                                onDrillDown={(id, relationType) => {
+                                    setContextHistory(prev => [...prev, listContext]);
+                                    if (relationType === 'child') {
+                                        setListContext({ type: 'children', id: selectedDetailsTodoId! });
+                                    } else if (relationType === 'parent') {
+                                        setListContext({ type: 'parents', id: selectedDetailsTodoId! });
+                                    }
+                                    setSelectedDetailsTodoId(id);
+                                }}
                                 onSaved={() => {
                                     setDetailsMode('idle');
                                     // Handled automatically via Next.js revalidatePath from server action

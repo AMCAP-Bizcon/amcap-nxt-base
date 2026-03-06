@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { type Todo, type TodoRelationship } from '@/db/schema'
 import { Button } from '@/components/ui/button'
-import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon } from 'lucide-react'
+import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon, Pin, PinOff } from 'lucide-react'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { updateTodoDetails, updateTodoRelationships } from './actions'
 import { createClient } from '@/utils/supabase/client'
@@ -27,18 +27,21 @@ interface TodoDetailsPanelProps {
     readOnly?: boolean
     onEnterEditMode?: () => void
     onClose: () => void
+    onDrillDown: (id: number, relationType: 'parent' | 'child') => void
     onSaved: () => void
 }
 
-export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, readOnly = false, onEnterEditMode, onClose, onSaved }, ref) => {
+export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, readOnly = false, onEnterEditMode, onClose, onDrillDown, onSaved }, ref) => {
     const [isSaving, setIsSaving] = useState(false)
     const [details, setDetails] = useState<{
+        text: string;
         description: string;
         images: string[];
         files: { name: string, url: string }[];
         parentIds: number[];
         childIds: number[];
-    }>({ description: '', images: [], files: [], parentIds: [], childIds: [] })
+        isPinned: boolean;
+    }>({ text: '', description: '', images: [], files: [], parentIds: [], childIds: [], isPinned: false })
 
     const [isUploading, setIsUploading] = useState(false)
     const imageInputRef = useRef<HTMLInputElement>(null)
@@ -55,11 +58,13 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         if (todo && todo.id !== currentTodoId.current) {
             currentTodoId.current = todo.id;
             setDetails({
+                text: todo.text || '',
                 description: todo.description || '',
                 images: Array.isArray(todo.images) ? todo.images : [],
                 files: Array.isArray(todo.files) ? todo.files : [],
                 parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
                 childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
+                isPinned: todo.isPinned ?? false,
             })
         }
     }, [todo, relationships])
@@ -75,9 +80,11 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             ]);
             await Promise.all([
                 updateTodoDetails(todo.id, {
+                    text: details.text,
                     description: details.description,
                     images: details.images,
                     files: details.files,
+                    isPinned: details.isPinned,
                 }),
                 updateTodoRelationships(todo.id, details.parentIds, details.childIds)
             ])
@@ -150,11 +157,13 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         handleDiscard: () => {
             if (todo) {
                 setDetails({
+                    text: todo.text || '',
                     description: todo.description || '',
                     images: Array.isArray(todo.images) ? todo.images : [],
                     files: Array.isArray(todo.files) ? todo.files : [],
                     parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
                     childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
+                    isPinned: todo.isPinned ?? false,
                 });
             }
         },
@@ -231,9 +240,34 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     return (
         <div className="w-full h-full bg-card border-l border-border flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border shadow-sm flex-shrink-0">
-                <h2 className="text-xl font-semibold tracking-tight">{todo.text}</h2>
-                <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+            <div className="flex items-center justify-between p-4 border-b border-border shadow-sm flex-shrink-0 gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {!readOnly ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => setDetails({ ...details, isPinned: !details.isPinned })}
+                                className={`p-2 rounded-md transition-colors flex-shrink-0 ${details.isPinned ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+                                aria-label="Toggle Pin"
+                            >
+                                {details.isPinned ? <PinOff className="w-5 h-5" /> : <Pin className="w-5 h-5" />}
+                            </button>
+                            <input
+                                type="text"
+                                value={details.text}
+                                onChange={(e) => setDetails({ ...details, text: e.target.value })}
+                                className="text-xl font-semibold tracking-tight bg-transparent border-b border-primary/50 outline-none px-1 py-0.5 w-full flex-1"
+                                placeholder="Todo title"
+                            />
+                        </>
+                    ) : (
+                        <h2 className="text-xl font-semibold tracking-tight truncate flex items-center gap-2">
+                            {details.isPinned && <Pin className="w-4 h-4 text-primary shrink-0" />}
+                            {todo.text}
+                        </h2>
+                    )}
+                </div>
+                <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
                     <X className="h-5 w-5" />
                     <span className="sr-only">Close</span>
                 </Button>
@@ -279,6 +313,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                             allTodosMap={allTodosMap}
                             readOnly={readOnly}
                             onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
+                            onClickTodo={(id) => onDrillDown(id, 'parent')}
                         />
                     ) : (
                         <RelationshipSubList
@@ -289,6 +324,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                             allTodosMap={allTodosMap}
                             readOnly={readOnly}
                             onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, childIds: newIds }))}
+                            onClickTodo={(id) => onDrillDown(id, 'child')}
                         />
                     )}
                 </div>

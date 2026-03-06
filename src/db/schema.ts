@@ -20,6 +20,7 @@ export const todos = pgTable('todos', {
     images: jsonb('images').default('[]').notNull(),
     files: jsonb('files').default('[]').notNull(),
     done: boolean('done').default(false).notNull(),
+    isPinned: boolean('is_pinned').default(false).notNull(),
     userId: uuid('user_id').notNull(),
     sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),

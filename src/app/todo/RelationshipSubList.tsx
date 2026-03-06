@@ -21,9 +21,10 @@ interface RelationshipSubListProps {
     allTodosMap: Map<number, Todo>;
     readOnly?: boolean;
     onLinksChanged: (newIds: number[]) => void;
+    onClickTodo?: (id: number) => void;
 }
 
-export const RelationshipSubList = forwardRef<RelationshipSubListRef, RelationshipSubListProps>(({ title, linkedIds, availableTodos, allTodosMap, readOnly = false, onLinksChanged }, ref) => {
+export const RelationshipSubList = forwardRef<RelationshipSubListRef, RelationshipSubListProps>(({ title, linkedIds, availableTodos, allTodosMap, readOnly = false, onLinksChanged, onClickTodo }, ref) => {
     const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete'>('idle')
     const [selectedIds, setSelectedIds] = useState<number[]>([])
     const [newTodoText, setNewTodoText] = useState('')
@@ -204,7 +205,7 @@ export const RelationshipSubList = forwardRef<RelationshipSubListRef, Relationsh
                                     className="h-4 w-4 rounded border-gray-300 text-primary cursor-pointer shrink-0"
                                 />
                             )}
-                            <div className="flex flex-col gap-1 w-full" onClick={() => { if (isEditing) setEditingTodoId(todo.id); }}>
+                            <div className="flex flex-col gap-1 w-full" onClick={() => { if (isEditing) { setEditingTodoId(todo.id); } }}>
                                 {isCurrentlyEditing ? (
                                     <AutoResizeTextarea
                                         value={todo.text}
@@ -213,7 +214,17 @@ export const RelationshipSubList = forwardRef<RelationshipSubListRef, Relationsh
                                         autoFocus
                                     />
                                 ) : (
-                                    <span className={cn("font-medium break-words whitespace-pre-wrap", todo.done ? 'line-through text-muted-foreground' : '')}>{todo.text}</span>
+                                    <span
+                                        className={cn("font-medium break-words whitespace-pre-wrap", todo.done ? 'line-through text-muted-foreground' : '', (readOnly && !isEditing && onClickTodo) ? "hover:text-primary transition-colors cursor-pointer" : "")} 
+                                        onClick={(e) => { 
+                                            if (readOnly && !isEditing && onClickTodo) {
+                                                e.stopPropagation();
+                                                onClickTodo(todo.id); 
+                                            }
+                                        }}
+                                    >
+                                        {todo.text}
+                                    </span>
                                 )}
                             </div>
                         </li>

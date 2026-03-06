@@ -158,6 +158,23 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
 }
 
 /**
+ * Toggles the pinned status of a single Todo item.
+ * 
+ * @param {number} id - The ID of the Todo item
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function toggleTodoPin(id: number) {
+    const user = await requireUser()
+
+    await db
+        .update(todos)
+        .set({ isPinned: sql`NOT ${todos.isPinned}` })
+        .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+
+    revalidatePath('/todo')
+}
+
+/**
  * Toggles the done status of multiple Todo items.
  * 
  * @param {Array<number>} ids - The IDs of the Todo items to toggle
@@ -216,7 +233,7 @@ export async function deleteMultipleTodos(ids: number[]) {
  * @param {Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files'>>} details - The fields to update
  * @throws {Error} If the user is unauthenticated
  */
-export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files'>>) {
+export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'images' | 'files' | 'isPinned'>>) {
     // 1. Verify who is making the request
     const user = await requireUser()
     const supabase = await createClient()
