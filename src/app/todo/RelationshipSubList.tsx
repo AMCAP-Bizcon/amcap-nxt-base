@@ -8,6 +8,11 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from '@/lib/utils'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 import { createTodo, updateTodoTexts, toggleTodosDoneStatus } from './actions'
+import { forwardRef, useImperativeHandle } from 'react'
+
+export interface RelationshipSubListRef {
+    saveIfUnsaved: () => Promise<void>;
+}
 
 interface RelationshipSubListProps {
     title: string;
@@ -18,7 +23,7 @@ interface RelationshipSubListProps {
     onLinksChanged: (newIds: number[]) => void;
 }
 
-export function RelationshipSubList({ title, linkedIds, availableTodos, allTodosMap, readOnly = false, onLinksChanged }: RelationshipSubListProps) {
+export const RelationshipSubList = forwardRef<RelationshipSubListRef, RelationshipSubListProps>(({ title, linkedIds, availableTodos, allTodosMap, readOnly = false, onLinksChanged }, ref) => {
     const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete'>('idle')
     const [selectedIds, setSelectedIds] = useState<number[]>([])
     const [newTodoText, setNewTodoText] = useState('')
@@ -79,6 +84,14 @@ export function RelationshipSubList({ title, linkedIds, availableTodos, allTodos
         }
     }
 
+    useImperativeHandle(ref, () => ({
+        saveIfUnsaved: async () => {
+            if (mode !== 'idle') {
+                await handleSave();
+            }
+        }
+    }));
+
     const handleDiscard = () => {
         // revert local text edits if editing
         setLocalTodos(localLinkedIds.map(id => allTodosMap.get(id)!).filter(Boolean))
@@ -106,10 +119,6 @@ export function RelationshipSubList({ title, linkedIds, availableTodos, allTodos
 
     return (
         <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                {title}
-            </label>
-
             {!readOnly && (
                 <div className="flex gap-2 w-full mt-1">
                     {mode === 'idle' ? (
@@ -213,4 +222,6 @@ export function RelationshipSubList({ title, linkedIds, availableTodos, allTodos
             </ul>
         </div>
     )
-}
+})
+
+RelationshipSubList.displayName = 'RelationshipSubList'

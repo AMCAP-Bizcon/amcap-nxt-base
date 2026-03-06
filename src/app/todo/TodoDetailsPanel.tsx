@@ -7,7 +7,7 @@ import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon } from 'lucide-
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { updateTodoDetails, updateTodoRelationships } from './actions'
 import { createClient } from '@/utils/supabase/client'
-import { RelationshipSubList } from './RelationshipSubList'
+import { RelationshipSubList, type RelationshipSubListRef } from './RelationshipSubList'
 
 import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 
@@ -44,8 +44,10 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const imageInputRef = useRef<HTMLInputElement>(null)
     const captureInputRef = useRef<HTMLInputElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const parentsListRef = useRef<RelationshipSubListRef>(null)
+    const childrenListRef = useRef<RelationshipSubListRef>(null)
     const currentTodoId = useRef<number | null>(null)
-    const [activeRelationshipTab, setActiveRelationshipTab] = useState<'parents' | 'children'>('parents')
+    const [activeRelationshipTab, setActiveRelationshipTab] = useState<'children' | 'parents'>('children')
 
     const supabase = createClient()
 
@@ -67,6 +69,10 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const handleSave = async () => {
         setIsSaving(true)
         try {
+            await Promise.all([
+                parentsListRef.current?.saveIfUnsaved(),
+                childrenListRef.current?.saveIfUnsaved()
+            ]);
             await Promise.all([
                 updateTodoDetails(todo.id, {
                     description: details.description,
@@ -251,21 +257,22 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     <div className="flex border-b border-border mb-4">
                         <button
                             type="button"
-                            onClick={() => setActiveRelationshipTab('parents')}
-                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeRelationshipTab === 'parents' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                        >
-                            Parent Todos
-                        </button>
-                        <button
-                            type="button"
                             onClick={() => setActiveRelationshipTab('children')}
                             className={`px-4 py-2 text-sm font-medium transition-colors ${activeRelationshipTab === 'children' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             Child Todos
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveRelationshipTab('parents')}
+                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeRelationshipTab === 'parents' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                            Parent Todos
+                        </button>
                     </div>
                     {activeRelationshipTab === 'parents' ? (
                         <RelationshipSubList
+                            ref={parentsListRef}
                             title="Parent Todos"
                             linkedIds={details.parentIds}
                             availableTodos={availableParents}
@@ -275,6 +282,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                         />
                     ) : (
                         <RelationshipSubList
+                            ref={childrenListRef}
                             title="Child Todos"
                             linkedIds={details.childIds}
                             availableTodos={availableChildren}
