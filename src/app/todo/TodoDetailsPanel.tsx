@@ -274,10 +274,22 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const headerActions = (
         <button
             type="button"
-            onClick={() => !readOnly && setDetails({ ...details, isPinned: !details.isPinned })}
-            disabled={readOnly}
-            className={`p-2 rounded-md transition-colors flex-shrink-0 ${details.isPinned ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground hover:text-foreground'} ${readOnly && !details.isPinned ? 'opacity-50 cursor-not-allowed' : ''}`}
-            aria-label="Toggle Pin"
+            onClick={async () => {
+                const newPinnedState = !details.isPinned;
+                setDetails({ ...details, isPinned: newPinnedState });
+                if (todo) {
+                    try {
+                        await updateTodoDetails(todo.id, { isPinned: newPinnedState });
+                        onSaved();
+                    } catch (error) {
+                        console.error('Failed to auto-save pin state', error);
+                        alert('Failed to save pin state.');
+                        setDetails({ ...details, isPinned: !newPinnedState }); // revert optimistic update
+                    }
+                }
+            }}
+            className={`p-2 rounded-md transition-colors flex-shrink-0 ${details.isPinned ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+            aria-label={details.isPinned ? "Unpin Todo" : "Pin Todo"}
         >
             {details.isPinned ? <PinOff className="w-5 h-5" /> : <Pin className="w-5 h-5" />}
         </button>

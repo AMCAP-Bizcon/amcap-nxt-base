@@ -120,9 +120,11 @@ export function TodoList({
         const { active, over } = event
         if (over && active.id !== over.id) {
             setTodos((items) => {
-                const oldIndex = items.findIndex(item => item.id === active.id)
-                const newIndex = items.findIndex(item => item.id === over.id)
-                return arrayMove(items, oldIndex, newIndex)
+                const currentSorted = [...items].sort((a,b) => a.sequence - b.sequence)
+                const oldIndex = currentSorted.findIndex(item => item.id === active.id)
+                const newIndex = currentSorted.findIndex(item => item.id === over.id)
+                const reordered = arrayMove(currentSorted, oldIndex, newIndex)
+                return reordered.map((item, index) => ({ ...item, sequence: index }))
             })
         }
     }

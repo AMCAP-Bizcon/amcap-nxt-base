@@ -19,9 +19,9 @@ interface MasterDetailLayoutProps {
 /**
  * A generic layout wrapper that handles the responsive Master/Detail split-pane pattern.
  */
-export function MasterDetailLayout({ 
-    listSlot, 
-    detailSlot, 
+export function MasterDetailLayout({
+    listSlot,
+    detailSlot,
     isDetailOpen,
     containerClassName,
     panelGroupClassName
@@ -37,18 +37,18 @@ export function MasterDetailLayout({
 
     return (
         <div className={cn("w-full flex flex-col max-h-full transition-all duration-300 ease-in-out", isDetailOpen ? 'max-w-full' : 'max-w-3xl mx-auto', containerClassName)}>
-            <ResizablePanelGroup 
-                orientation={isMobile ? "vertical" : "horizontal"} 
+            <ResizablePanelGroup
+                orientation={isMobile ? "vertical" : "horizontal"}
                 className={cn(
-                    "w-full flex-initial items-stretch rounded-lg border border-border bg-card/50 transition-shadow duration-300 ease-out overflow-hidden", 
-                    isMobile ? 'min-h-[400px]' : 'min-h-[100px]', 
+                    "w-full flex-initial items-stretch rounded-lg border border-border bg-card/50 transition-shadow duration-300 ease-out overflow-hidden",
+                    isMobile ? 'min-h-[400px]' : 'min-h-[100px]',
                     panelGroupClassName
                 )}
             >
                 {/* Left Panel: The List */}
-                <ResizablePanel 
-                    defaultSize={isDetailOpen ? 30 : 100} 
-                    minSize={20} 
+                <ResizablePanel
+                    defaultSize={isDetailOpen ? 35 : 100}
+                    minSize={20}
                     className={cn("transition-all duration-300 ease-in-out h-full flex flex-col")}
                 >
                     {listSlot}
@@ -58,9 +58,9 @@ export function MasterDetailLayout({
                 {isDetailOpen && detailSlot && (
                     <>
                         <ResizableHandle withHandle className="bg-border/50 hover:bg-primary/20 transition-colors" />
-                        <ResizablePanel 
-                            defaultSize={70} 
-                            minSize={40} 
+                        <ResizablePanel
+                            defaultSize={70}
+                            minSize={40}
                             className="h-full animate-in slide-in-from-right-10 fade-in duration-300 flex flex-col"
                         >
                             {detailSlot}

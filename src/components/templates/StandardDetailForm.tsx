@@ -17,24 +17,30 @@ interface StandardDetailFormProps {
 export function StandardDetailForm({ title, headerActions, formActions, onClose, children }: StandardDetailFormProps) {
     return (
         <div className="w-full h-full bg-card flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border shadow-sm flex-shrink-0 gap-3">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+            {/* Unified Top Toolbar */}
+            <div className="flex items-center justify-between p-4 border-b border-border/50 bg-card/50 gap-3 shrink-0">
+                <div className="flex items-center gap-2">
                     {headerActions}
-                    <div className="text-xl font-semibold tracking-tight truncate flex-1 flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+                </div>
+                {formActions && (
+                    <div className="flex-1 flex items-center justify-center gap-2 overflow-x-auto py-4 px-2 -my-3 scrollbar-hide">
+                        {formActions}
+                    </div>
+                )}
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                        <X className="h-5 w-5" />
+                        <span className="sr-only">Close</span>
+                    </Button>
+                </div>
+            </div>
+
+            {/* Title Section */}
+            {title && (
+                <div className="px-4 md:px-6 pt-4 shrink-0">
+                    <div className="text-xl font-semibold tracking-tight truncate w-full">
                         {title}
                     </div>
-                </div>
-                <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                    <X className="h-5 w-5" />
-                    <span className="sr-only">Close</span>
-                </Button>
-            </div>
-            
-            {/* Form Actions (Toolbar) */}
-            {formActions && (
-                <div className="p-4 border-b border-border/50 bg-muted/20 shrink-0 overflow-x-auto scrollbar-hide flex items-center gap-2">
-                    {formActions}
                 </div>
             )}
 

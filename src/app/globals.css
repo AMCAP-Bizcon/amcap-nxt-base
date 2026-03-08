@@ -45,19 +45,19 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* Custom Glow Box Shadows */
-  --box-shadow-glow-slate: 0 0 15px rgba(148, 163, 184, 0.3);
-  --box-shadow-glow-slate-sm: 0 0 15px rgba(100, 116, 139, 0.5);
-  --box-shadow-glow-violet: 0 0 20px rgba(139, 92, 246, 0.4);
-  --box-shadow-glow-violet-sm: 0 0 15px rgba(139, 92, 246, 0.5);
-  --box-shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.4);
-  --box-shadow-glow-blue-sm: 0 0 15px rgba(59, 130, 246, 0.5);
-  --box-shadow-glow-amber: 0 0 20px rgba(245, 158, 11, 0.4);
-  --box-shadow-glow-amber-sm: 0 0 15px rgba(245, 158, 11, 0.5);
-  --box-shadow-glow-emerald: 0 0 20px rgba(16, 185, 129, 0.4);
-  --box-shadow-glow-emerald-sm: 0 0 15px rgba(16, 185, 129, 0.5);
-  --box-shadow-glow-rose: 0 0 20px rgba(244, 63, 94, 0.4);
-  --box-shadow-glow-rose-sm: 0 0 15px rgba(244, 63, 94, 0.5);
-  --box-shadow-glow-sky-sm: 0 0 15px rgba(14, 165, 233, 0.5);
+  --shadow-glow-slate: 0 0 15px rgba(148, 163, 184, 0.3);
+  --shadow-glow-slate-sm: 0 0 15px rgba(100, 116, 139, 0.5);
+  --shadow-glow-violet: 0 0 20px rgba(139, 92, 246, 0.4);
+  --shadow-glow-violet-sm: 0 0 15px rgba(139, 92, 246, 0.5);
+  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.4);
+  --shadow-glow-blue-sm: 0 0 15px rgba(59, 130, 246, 0.5);
+  --shadow-glow-amber: 0 0 20px rgba(245, 158, 11, 0.4);
+  --shadow-glow-amber-sm: 0 0 15px rgba(245, 158, 11, 0.5);
+  --shadow-glow-emerald: 0 0 20px rgba(16, 185, 129, 0.4);
+  --shadow-glow-emerald-sm: 0 0 15px rgba(16, 185, 129, 0.5);
+  --shadow-glow-rose: 0 0 20px rgba(244, 63, 94, 0.4);
+  --shadow-glow-rose-sm: 0 0 15px rgba(244, 63, 94, 0.5);
+  --shadow-glow-sky-sm: 0 0 15px rgba(14, 165, 233, 0.5);
 }
 
 :root {

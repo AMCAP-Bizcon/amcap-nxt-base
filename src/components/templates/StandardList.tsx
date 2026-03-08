@@ -17,7 +17,7 @@ export function StandardList({ title, toolbarActions, children }: StandardListPr
                 <div className="flex flex-col shrink-0 p-4 border-b border-border/50 bg-card/50 gap-3">
                     {title && <div className="text-xl font-semibold">{title}</div>}
                     {toolbarActions && (
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                        <div className="flex items-center justify-center gap-2 overflow-x-auto py-4 px-2 -my-3 scrollbar-hide">
                             {toolbarActions}
                         </div>
                     )}
