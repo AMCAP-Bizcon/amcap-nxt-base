@@ -19,9 +19,11 @@ A production-ready, infinitely scalable Full-Stack SaaS boilerplate. Built with 
 * **Edge Routing:** Route protection handled via Next.js 16 `proxy.ts` (the high-performance replacement for the deprecated `middleware.ts`).
 * **Connection Pooling:** Configured to safely handle serverless database connections without crashing Postgres.
 * **App Icons Grid UX:** iOS-inspired dynamic grid layout on the home page with hover animations and an emerald-themed aesthetic.
-* **Interactive Dashboard (Todo App):** Complete CRUD task management system built-in:
+* **Modular Master-Detail Architecture:** Abstraction of complex data views into generic, highly reusable templates (`src/components/templates/`). This enterprise-grade layout effortlessly scales to new CRM/ERP modules using a standard `BaseModuleConfig`.
+* **URL-Driven State Management:** Deep linking out of the box with `searchParams`-powered layouts (`?id=123&tab=details`).
+* **Interactive Dashboard (Todo Module):** A proof-of-concept CRUD task management system built on the generic module architecture:
   - **Drag and Drop Reordering:** Mobile-responsive, touch-screen compatible vertical reordering.
-  - **Inline Editing:** Seamlessly edit tasks inline with Save/Discard toolbar actions.
+  - **Inline Editing & Drill-Down:** Seamlessly edit tasks inline and navigate infinite parent/child relationships via Master-Detail drill-downs.
   - **Power User Shortcuts:** Keyboard workflow support (`Enter` to save, `Esc` to discard).
   - **Optimistic UI:** Instant UI feedback on marking tasks, reordering, and saving—eliminating layout shifts and rendering latency.
 * **Ready-to-Use Components:** Includes a global authentication Navbar, login/signup forms, and protected user routes.

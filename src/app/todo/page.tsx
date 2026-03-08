@@ -4,7 +4,13 @@ import { eq } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
 import { TodoList } from './TodoList'
 
-export default async function ToDoPage() {
+export default async function ToDoPage(props: {
+    searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
+    const searchParams = await props.searchParams;
+    const selectedId = searchParams.id ? parseInt(searchParams.id, 10) : null;
+    const activeTab = searchParams.tab || 'children';
+
     // 1. Get the current user
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -24,8 +30,13 @@ export default async function ToDoPage() {
         .where(eq(todoRelationships.userId, user!.id))
 
     return (
-        <div className="flex justify-center p-8 w-full flex-1 min-h-0">
-            <TodoList initialTodos={userTodos} initialRelationships={userRelationships} />
+        <div className="flex justify-center p-8 w-full flex-1 min-h-0 bg-transparent">
+            <TodoList 
+                initialTodos={userTodos} 
+                initialRelationships={userRelationships} 
+                selectedId={selectedId}
+                activeTab={activeTab}
+            />
         </div>
     )
 }

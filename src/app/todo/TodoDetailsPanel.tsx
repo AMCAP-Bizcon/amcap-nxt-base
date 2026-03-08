@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 import { type Todo, type TodoRelationship } from '@/db/schema'
 import { Button } from '@/components/ui/button'
-import { X, Save, Image as ImageIcon, FileText, Link as LinkIcon, Pin, PinOff } from 'lucide-react'
+import { Save, Image as ImageIcon, FileText, Camera, Pin, PinOff, Edit2, XCircle, X } from 'lucide-react'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { updateTodoDetails, updateTodoRelationships } from './actions'
 import { createClient } from '@/utils/supabase/client'
 import { RelationshipSubList, type RelationshipSubListRef } from './RelationshipSubList'
-
-import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
+import { StandardDetailForm } from '@/components/templates/StandardDetailForm'
+import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 
 export interface TodoDetailsPanelRef {
     handleSave: () => Promise<void>;
@@ -29,9 +29,12 @@ interface TodoDetailsPanelProps {
     onClose: () => void
     onDrillDown: (id: number, relationType: 'parent' | 'child') => void
     onSaved: () => void
+    activeTab: string
+    onTabChange: (tabId: string) => void
+    onDiscard: () => void
 }
 
-export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, readOnly = false, onEnterEditMode, onClose, onDrillDown, onSaved }, ref) => {
+export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, readOnly = false, onEnterEditMode, onClose, onDrillDown, onSaved, activeTab, onTabChange, onDiscard }, ref) => {
     const [isSaving, setIsSaving] = useState(false)
     const [details, setDetails] = useState<{
         text: string;
@@ -50,7 +53,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const parentsListRef = useRef<RelationshipSubListRef>(null)
     const childrenListRef = useRef<RelationshipSubListRef>(null)
     const currentTodoId = useRef<number | null>(null)
-    const [activeRelationshipTab, setActiveRelationshipTab] = useState<'children' | 'parents'>('children')
 
     const supabase = createClient()
 
@@ -97,7 +99,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         }
     }
 
-    // Validate cyclic dependencies on the client-side
     const allTodosMap = useMemo(() => new Map(allTodos.map(t => [t.id, t])), [allTodos]);
 
     const simulatedGraph = useMemo(() => {
@@ -152,30 +153,31 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         setDetails(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== index) }))
     }
 
+    const handleDiscard = () => {
+        if (todo) {
+            setDetails({
+                text: todo.text || '',
+                description: todo.description || '',
+                images: Array.isArray(todo.images) ? todo.images : [],
+                files: Array.isArray(todo.files) ? todo.files : [],
+                parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
+                childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
+                isPinned: todo.isPinned ?? false,
+            });
+        }
+        onDiscard();
+    };
+
+    const promptAddImage = () => imageInputRef.current?.click();
+    const promptCaptureImage = () => captureInputRef.current?.click();
+    const promptAddFile = () => fileInputRef.current?.click();
+
     useImperativeHandle(ref, () => ({
         handleSave,
-        handleDiscard: () => {
-            if (todo) {
-                setDetails({
-                    text: todo.text || '',
-                    description: todo.description || '',
-                    images: Array.isArray(todo.images) ? todo.images : [],
-                    files: Array.isArray(todo.files) ? todo.files : [],
-                    parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
-                    childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
-                    isPinned: todo.isPinned ?? false,
-                });
-            }
-        },
-        promptAddImage: () => {
-            imageInputRef.current?.click();
-        },
-        promptCaptureImage: () => {
-            captureInputRef.current?.click();
-        },
-        promptAddFile: () => {
-            fileInputRef.current?.click();
-        },
+        handleDiscard,
+        promptAddImage,
+        promptCaptureImage,
+        promptAddFile,
         isSaving
     }));
 
@@ -237,164 +239,170 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         }
     };
 
+    const formActions = readOnly ? (
+        <>
+            <Button variant="outline" size="sm" onClick={promptAddImage} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-3 shrink-0">
+                <ImageIcon className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                <span className="hidden sm:inline">Add Image</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={promptCaptureImage} className="h-9 text-pink-600 hover:text-pink-700 hover:bg-pink-50 hover:shadow-glow-pink-sm px-3 shrink-0">
+                <Camera className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                <span className="hidden sm:inline">Capture</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={promptAddFile} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-3 shrink-0">
+                <FileText className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                <span className="hidden sm:inline">Add File</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={onEnterEditMode} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-3 shrink-0">
+                <Edit2 className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                <span className="hidden sm:inline">Edit Details</span>
+            </Button>
+        </>
+    ) : (
+        <>
+            <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50 px-3 shrink-0">
+                <XCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                <span className="hidden sm:inline">Discard (Esc)</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50 px-3 shrink-0">
+                <Save className="w-4 h-4 sm:mr-1.5 shrink-0" />
+                <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save (Enter)'}</span>
+            </Button>
+        </>
+    )
+
+    const headerActions = (
+        <button
+            type="button"
+            onClick={() => !readOnly && setDetails({ ...details, isPinned: !details.isPinned })}
+            disabled={readOnly}
+            className={`p-2 rounded-md transition-colors flex-shrink-0 ${details.isPinned ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground hover:text-foreground'} ${readOnly && !details.isPinned ? 'opacity-50 cursor-not-allowed' : ''}`}
+            aria-label="Toggle Pin"
+        >
+            {details.isPinned ? <PinOff className="w-5 h-5" /> : <Pin className="w-5 h-5" />}
+        </button>
+    )
+
+    const titleEl = !readOnly ? (
+        <input
+            type="text"
+            value={details.text}
+            onChange={(e) => setDetails({ ...details, text: e.target.value })}
+            className="text-xl font-semibold tracking-tight bg-transparent border-b border-primary/50 outline-none px-1 py-0.5 w-full flex-1"
+            placeholder="Todo title"
+        />
+    ) : (
+        <span className="truncate block w-full">{todo.text}</span>
+    )
+
     return (
-        <div className="w-full h-full bg-card border-l border-border flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border shadow-sm flex-shrink-0 gap-3">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {!readOnly ? (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => setDetails({ ...details, isPinned: !details.isPinned })}
-                                className={`p-2 rounded-md transition-colors flex-shrink-0 ${details.isPinned ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
-                                aria-label="Toggle Pin"
-                            >
-                                {details.isPinned ? <PinOff className="w-5 h-5" /> : <Pin className="w-5 h-5" />}
-                            </button>
-                            <input
-                                type="text"
-                                value={details.text}
-                                onChange={(e) => setDetails({ ...details, text: e.target.value })}
-                                className="text-xl font-semibold tracking-tight bg-transparent border-b border-primary/50 outline-none px-1 py-0.5 w-full flex-1"
-                                placeholder="Todo title"
-                            />
-                        </>
-                    ) : (
-                        <h2 className="text-xl font-semibold tracking-tight truncate flex items-center gap-2">
-                            {details.isPinned && <Pin className="w-4 h-4 text-primary shrink-0" />}
-                            {todo.text}
-                        </h2>
-                    )}
-                </div>
-                <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                    <X className="h-5 w-5" />
-                    <span className="sr-only">Close</span>
-                </Button>
+        <StandardDetailForm 
+            title={titleEl}
+            headerActions={headerActions}
+            formActions={formActions}
+            onClose={onClose}
+        >
+            {/* Description */}
+            <div>
+                <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Description</label>
+                <RichTextEditor
+                    value={details.description}
+                    onChange={(value) => setDetails({ ...details, description: value })}
+                    placeholder="Add a more detailed description..."
+                    readOnly={readOnly}
+                />
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                {/* Description */}
-                <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Description</label>
-                    <RichTextEditor
-                        value={details.description}
-                        onChange={(value) => setDetails({ ...details, description: value })}
-                        placeholder="Add a more detailed description..."
-                        readOnly={readOnly}
-                    />
-                </div>
+            {/* Parents/Children Relationship Selectors using StandardSublistTabs */}
+            <StandardSublistTabs 
+                tabs={[
+                    {
+                        id: 'children',
+                        label: 'Child Todos',
+                        content: (
+                            <RelationshipSubList
+                                ref={childrenListRef}
+                                title="Child Todos"
+                                linkedIds={details.childIds}
+                                availableTodos={availableChildren}
+                                allTodosMap={allTodosMap}
+                                readOnly={readOnly}
+                                onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, childIds: newIds }))}
+                                onClickTodo={(id) => onDrillDown(id, 'child')}
+                            />
+                        )
+                    },
+                    {
+                        id: 'parents',
+                        label: 'Parent Todos',
+                        content: (
+                            <RelationshipSubList
+                                ref={parentsListRef}
+                                title="Parent Todos"
+                                linkedIds={details.parentIds}
+                                availableTodos={availableParents}
+                                allTodosMap={allTodosMap}
+                                readOnly={readOnly}
+                                onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
+                                onClickTodo={(id) => onDrillDown(id, 'parent')}
+                            />
+                        )
+                    }
+                ]}
+                activeTab={activeTab}
+                onTabChange={onTabChange}
+            />
 
-                {/* Parents/Children Relationship Selectors */}
-                <div>
-                    <div className="flex border-b border-border mb-4">
-                        <button
-                            type="button"
-                            onClick={() => setActiveRelationshipTab('children')}
-                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeRelationshipTab === 'children' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                        >
-                            Child Todos
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveRelationshipTab('parents')}
-                            className={`px-4 py-2 text-sm font-medium transition-colors ${activeRelationshipTab === 'parents' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                        >
-                            Parent Todos
-                        </button>
+            {/* Images List */}
+            <div>
+                <label className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" /> Attached Images
+                </label>
+                {details.images.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                        {details.images.map((img, i) => (
+                            <div key={i} className="relative group rounded-md border border-border/50 overflow-hidden bg-muted aspect-video flex-shrink-0 shadow-sm">
+                                <img src={img} alt={`Attached ${i}`} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Invalid+Image' }} />
+                                {!readOnly && (
+                                    <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                    {activeRelationshipTab === 'parents' ? (
-                        <RelationshipSubList
-                            ref={parentsListRef}
-                            title="Parent Todos"
-                            linkedIds={details.parentIds}
-                            availableTodos={availableParents}
-                            allTodosMap={allTodosMap}
-                            readOnly={readOnly}
-                            onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
-                            onClickTodo={(id) => onDrillDown(id, 'parent')}
-                        />
-                    ) : (
-                        <RelationshipSubList
-                            ref={childrenListRef}
-                            title="Child Todos"
-                            linkedIds={details.childIds}
-                            availableTodos={availableChildren}
-                            allTodosMap={allTodosMap}
-                            readOnly={readOnly}
-                            onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, childIds: newIds }))}
-                            onClickTodo={(id) => onDrillDown(id, 'child')}
-                        />
-                    )}
-                </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground italic mb-4">No images attached.</p>
+                )}
+            </div>
 
-                {/* Images List */}
-                <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                        <ImageIcon className="h-4 w-4" /> Attached Images
-                    </label>
-                    {details.images.length > 0 && (
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            {details.images.map((img, i) => (
-                                <div key={i} className="relative group rounded-md border border-border/50 overflow-hidden bg-muted aspect-video flex-shrink-0 shadow-sm">
-                                    <img src={img} alt={`Attached ${i}`} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Invalid+Image' }} />
-                                    {!readOnly && (
-                                        <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
-                                            <X className="h-3 w-3" />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Files List */}
-                <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                        <FileText className="h-4 w-4" /> Attached Files
-                    </label>
-                    {details.files.length > 0 && (
-                        <ul className="space-y-2 mb-4">
-                            {details.files.map((file, i) => (
-                                <li key={i} className="flex items-center justify-between p-2 rounded-md border border-border bg-muted/40 shadow-sm">
-                                    <a href={file.url} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:underline truncate mr-2 block break-all font-medium transition-colors hover:text-blue-600">{file.name}</a>
-                                    {!readOnly && (
-                                        <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive flex-shrink-0 p-1 hover:bg-destructive/10 rounded-full transition-colors">
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
+            {/* Files List */}
+            <div>
+                <label className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> Attached Files
+                </label>
+                {details.files.length > 0 ? (
+                    <ul className="space-y-2 mb-4">
+                        {details.files.map((file, i) => (
+                            <li key={i} className="flex items-center justify-between p-2 rounded-md border border-border bg-muted/40 shadow-sm">
+                                <a href={file.url} target="_blank" rel="noreferrer" className="text-sm text-blue-500 hover:underline truncate mr-2 block break-all font-medium transition-colors hover:text-blue-600">{file.name}</a>
+                                {!readOnly && (
+                                    <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive flex-shrink-0 p-1 hover:bg-destructive/10 rounded-full transition-colors">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-sm text-muted-foreground italic mb-4">No files attached.</p>
+                )}
             </div>
 
             {/* Hidden Inputs for Uploads */}
-            <input
-                type="file"
-                ref={imageInputRef}
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageUpload}
-            />
-            <input
-                type="file"
-                ref={captureInputRef}
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleImageUpload}
-            />
-            <input
-                type="file"
-                ref={fileInputRef}
-                accept="*"
-                className="hidden"
-                onChange={handleFileUpload}
-            />
+            <input type="file" ref={imageInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
+            <input type="file" ref={captureInputRef} accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} />
+            <input type="file" ref={fileInputRef} accept="*" className="hidden" onChange={handleFileUpload} />
 
             {/* Show an uploading indicator if necessary */}
             {isUploading && (
@@ -405,7 +413,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     </div>
                 </div>
             )}
-        </div>
+        </StandardDetailForm>
     )
 })
 
