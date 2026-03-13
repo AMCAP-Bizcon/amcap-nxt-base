@@ -24,7 +24,7 @@ export function StandardSublistTabs({ tabs, activeTab, onTabChange, className }:
 
     return (
         <div className={cn("flex flex-col", className)}>
-            <div className="flex border-b border-border mb-4 overflow-x-auto scrollbar-hide">
+            <div className="flex flex-wrap border-b border-border mb-4">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}

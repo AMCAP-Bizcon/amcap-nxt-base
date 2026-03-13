@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
+import { ResponsiveToolbar } from '@/components/ui/responsive-toolbar'
 
 interface StandardDetailFormProps {
     title: ReactNode;
@@ -23,9 +24,9 @@ export function StandardDetailForm({ title, headerActions, formActions, onClose,
                     {headerActions}
                 </div>
                 {formActions && (
-                    <div className="flex-1 flex items-center justify-center gap-2 overflow-x-auto py-4 px-2 -my-3 scrollbar-hide">
+                    <ResponsiveToolbar className="flex-1 -my-0 py-0">
                         {formActions}
-                    </div>
+                    </ResponsiveToolbar>
                 )}
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">

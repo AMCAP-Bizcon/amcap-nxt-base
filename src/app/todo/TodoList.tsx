@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
+import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle, PlusCircle, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -237,46 +238,22 @@ export function TodoList({
     const listToolbarActions = mode === 'idle' ? (
         <>
             {contextHistory.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => {
+                <ToolbarButton variant="outline" onClick={() => {
                     const prev = contextHistory[contextHistory.length - 1];
                     setListContext(prev);
                     setContextHistory(h => h.slice(0, -1));
-                }} className="h-9 text-slate-600 hover:text-slate-700 hover:bg-slate-50 hover:shadow-glow-slate-sm px-3 shrink-0">
-                    <ArrowLeft className="w-4 h-4 mr-1.5" />
-                    <span>Back</span>
-                </Button>
+                }} className="h-9 text-slate-600 hover:text-slate-700 hover:bg-slate-50 hover:shadow-glow-slate-sm" icon={<ArrowLeft />} label="Back" />
             )}
-            <Button variant="outline" size="sm" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-3 shrink-0">
-                <PlusCircle className="w-4 h-4 mr-1.5" />
-                <span>Create</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setMode('editing')} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-3 shrink-0">
-                <Edit2 className="w-4 h-4 mr-1.5" />
-                <span>Edit</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setMode('reordering')} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm px-3 shrink-0">
-                <MoveVertical className="w-4 h-4 mr-1.5" />
-                <span>Move</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setMode('done')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-3 shrink-0">
-                <CheckSquare className="w-4 h-4 mr-1.5" />
-                <span>Complete</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm px-3 shrink-0">
-                <Trash2 className="w-4 h-4 mr-1.5" />
-                <span>Remove</span>
-            </Button>
+            <ToolbarButton variant="outline" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<PlusCircle />} label="Create" />
+            <ToolbarButton variant="outline" onClick={() => setMode('editing')} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<Edit2 />} label="Edit" />
+            <ToolbarButton variant="outline" onClick={() => setMode('reordering')} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm" icon={<MoveVertical />} label="Move" />
+            <ToolbarButton variant="outline" onClick={() => setMode('done')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Complete" />
+            <ToolbarButton variant="outline" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm" icon={<Trash2 />} label="Remove" />
         </>
     ) : (
         <>
-            <Button variant="outline" size="sm" onClick={handleDiscardList} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50 px-3 shrink-0">
-                <XCircle className="w-4 h-4 mr-1.5" />
-                <span>Discard (Esc)</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleSaveList} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50 px-3 shrink-0">
-                <Save className="w-4 h-4 mr-1.5" />
-                <span>{isSaving ? 'Saving...' : 'Save (Enter)'}</span>
-            </Button>
+            <ToolbarButton variant="outline" onClick={handleDiscardList} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard (Esc)" />
+            <ToolbarButton variant="outline" onClick={handleSaveList} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save (Enter)'} />
         </>
     )
 

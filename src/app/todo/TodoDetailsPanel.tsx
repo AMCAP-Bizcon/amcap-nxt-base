@@ -4,6 +4,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle, useRef, useMemo }
 import { type Todo, type TodoRelationship } from '@/db/schema'
 import { Button } from '@/components/ui/button'
 import { Save, Image as ImageIcon, FileText, Camera, Pin, PinOff, Edit2, XCircle, X } from 'lucide-react'
+import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { updateTodoDetails, updateTodoRelationships } from './actions'
 import { createClient } from '@/utils/supabase/client'
@@ -241,33 +242,15 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
     const formActions = readOnly ? (
         <>
-            <Button variant="outline" size="sm" onClick={promptAddImage} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm px-3 shrink-0">
-                <ImageIcon className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                <span className="hidden sm:inline">Add Image</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={promptCaptureImage} className="h-9 text-pink-600 hover:text-pink-700 hover:bg-pink-50 hover:shadow-glow-pink-sm px-3 shrink-0">
-                <Camera className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                <span className="hidden sm:inline">Capture</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={promptAddFile} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm px-3 shrink-0">
-                <FileText className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                <span className="hidden sm:inline">Add File</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={onEnterEditMode} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm px-3 shrink-0">
-                <Edit2 className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                <span className="hidden sm:inline">Edit Details</span>
-            </Button>
+            <ToolbarButton variant="outline" onClick={promptAddImage} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<ImageIcon />} label="Add Image" />
+            <ToolbarButton variant="outline" onClick={promptCaptureImage} className="h-9 text-pink-600 hover:text-pink-700 hover:bg-pink-50 hover:shadow-glow-pink-sm" icon={<Camera />} label="Capture" />
+            <ToolbarButton variant="outline" onClick={promptAddFile} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<FileText />} label="Add File" />
+            <ToolbarButton variant="outline" onClick={onEnterEditMode} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<Edit2 />} label="Edit Details" />
         </>
     ) : (
         <>
-            <Button variant="outline" size="sm" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50 px-3 shrink-0">
-                <XCircle className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                <span className="hidden sm:inline">Discard (Esc)</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleSave} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50 px-3 shrink-0">
-                <Save className="w-4 h-4 sm:mr-1.5 shrink-0" />
-                <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save (Enter)'}</span>
-            </Button>
+            <ToolbarButton variant="outline" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard (Esc)" />
+            <ToolbarButton variant="outline" onClick={handleSave} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save (Enter)'} />
         </>
     )
 
