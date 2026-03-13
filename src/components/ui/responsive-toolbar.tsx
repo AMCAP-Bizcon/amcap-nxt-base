@@ -99,7 +99,7 @@ export function ResponsiveToolbar({
 
 interface ToolbarButtonProps extends Omit<React.ComponentProps<typeof Button>, 'children'> {
   /** The icon element to render (always visible). */
-  icon: React.ReactElement
+  icon: React.ReactElement<{ className?: string }>
   /** The text label (visible only when the toolbar is in expanded mode). */
   label: string
 }
