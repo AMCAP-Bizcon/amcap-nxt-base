@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef, useMemo, useCallback } from 'react'
 import { type Todo, type TodoRelationship } from '@/db/schema'
 import { Button } from '@/components/ui/button'
 import { Save, Image as ImageIcon, FileText, Camera, Pin, PinOff, Edit2, XCircle, X } from 'lucide-react'
@@ -48,12 +48,27 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     }>({ text: '', description: '', images: [], files: [], parentIds: [], childIds: [], isPinned: false })
 
     const [isUploading, setIsUploading] = useState(false)
+    /** Tracks whether any sublist is in a non-idle mode (editing, reordering, etc.). */
+    const [sublistBusy, setSublistBusy] = useState(false)
+    const childrenSublistMode = useRef<string>('idle')
+    const parentsSublistMode = useRef<string>('idle')
     const imageInputRef = useRef<HTMLInputElement>(null)
     const captureInputRef = useRef<HTMLInputElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const parentsListRef = useRef<RelationshipSubListRef>(null)
     const childrenListRef = useRef<RelationshipSubListRef>(null)
     const currentTodoId = useRef<number | null>(null)
+
+    /** Recalculates sublistBusy whenever either sublist reports a mode change. */
+    const handleChildrenModeChange = useCallback((mode: string) => {
+        childrenSublistMode.current = mode
+        setSublistBusy(mode !== 'idle' || parentsSublistMode.current !== 'idle')
+    }, [])
+
+    const handleParentsModeChange = useCallback((mode: string) => {
+        parentsSublistMode.current = mode
+        setSublistBusy(mode !== 'idle' || childrenSublistMode.current !== 'idle')
+    }, [])
 
     const supabase = createClient()
 
@@ -77,10 +92,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const handleSave = async () => {
         setIsSaving(true)
         try {
-            await Promise.all([
-                parentsListRef.current?.saveIfUnsaved(),
-                childrenListRef.current?.saveIfUnsaved()
-            ]);
             await Promise.all([
                 updateTodoDetails(todo.id, {
                     text: details.text,
@@ -247,14 +258,14 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             <ToolbarButton variant="outline" onClick={promptAddFile} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<FileText />} label="Add File" />
             <ToolbarButton variant="outline" onClick={onEnterEditMode} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<Edit2 />} label="Edit Details" />
         </>
-    ) : (
+    ) : sublistBusy ? null : (
         <>
-            <ToolbarButton variant="outline" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard (Esc)" />
-            <ToolbarButton variant="outline" onClick={handleSave} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save (Enter)'} />
+            <ToolbarButton variant="outline" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard" />
+            <ToolbarButton variant="outline" onClick={handleSave} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save'} />
         </>
     )
 
-    const headerActions = (
+    const headerActions = readOnly ? (
         <button
             type="button"
             onClick={async () => {
@@ -276,7 +287,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         >
             {details.isPinned ? <PinOff className="w-5 h-5" /> : <Pin className="w-5 h-5" />}
         </button>
-    )
+    ) : null
 
     const titleEl = !readOnly ? (
         <input
@@ -291,11 +302,12 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     )
 
     return (
-        <StandardDetailForm 
+        <StandardDetailForm
             title={titleEl}
             headerActions={headerActions}
             formActions={formActions}
             onClose={onClose}
+            hideClose={!readOnly}
         >
             {/* Description */}
             <div>
@@ -309,7 +321,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             </div>
 
             {/* Parents/Children Relationship Selectors using StandardSublistTabs */}
-            <StandardSublistTabs 
+            <StandardSublistTabs
                 tabs={[
                     {
                         id: 'children',
@@ -324,6 +336,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                                 readOnly={readOnly}
                                 onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, childIds: newIds }))}
                                 onClickTodo={(id) => onDrillDown(id, 'child')}
+                                onModeChange={handleChildrenModeChange}
                             />
                         )
                     },
@@ -340,12 +353,14 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                                 readOnly={readOnly}
                                 onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
                                 onClickTodo={(id) => onDrillDown(id, 'parent')}
+                                onModeChange={handleParentsModeChange}
                             />
                         )
                     }
                 ]}
                 activeTab={activeTab}
                 onTabChange={onTabChange}
+                disableTabSwitch={sublistBusy}
             />
 
             {/* Images List */}

@@ -88,14 +88,21 @@ interface RelationshipSubListProps {
     readOnly?: boolean;
     onLinksChanged: (newIds: number[]) => void;
     onClickTodo?: (id: number) => void;
+    /** Fires whenever the sublist's internal mode changes (e.g. idle → editing). */
+    onModeChange?: (mode: 'idle' | 'creating' | 'editing' | 'done' | 'delete' | 'reordering') => void;
 }
 
-export const RelationshipSubList = forwardRef<RelationshipSubListRef, RelationshipSubListProps>(({ title, linkedIds, availableTodos, allTodosMap, readOnly = false, onLinksChanged, onClickTodo }, ref) => {
+export const RelationshipSubList = forwardRef<RelationshipSubListRef, RelationshipSubListProps>(({ title, linkedIds, availableTodos, allTodosMap, readOnly = false, onLinksChanged, onClickTodo, onModeChange }, ref) => {
     const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete' | 'reordering'>('idle')
     const [selectedIds, setSelectedIds] = useState<number[]>([])
     const [newTodoText, setNewTodoText] = useState('')
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null)
     const [isSaving, setIsSaving] = useState(false)
+
+    /** Notify parent whenever the sublist mode changes. */
+    useEffect(() => {
+        onModeChange?.(mode)
+    }, [mode, onModeChange])
 
     // We maintain a local copy of "linkedIds" array from Props
     const [localLinkedIds, setLocalLinkedIds] = useState(linkedIds)
@@ -220,8 +227,8 @@ export const RelationshipSubList = forwardRef<RelationshipSubListRef, Relationsh
                         </>
                     ) : (
                         <>
-                            <ToolbarButton variant="outline" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard (Esc)" />
-                            <ToolbarButton variant="outline" onClick={handleSave} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save (Enter)'} />
+                            <ToolbarButton variant="outline" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard" />
+                            <ToolbarButton variant="outline" onClick={handleSave} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save'} />
                         </>
                     )}
                 </ResponsiveToolbar>

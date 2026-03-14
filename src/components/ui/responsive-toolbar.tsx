@@ -24,6 +24,8 @@ interface ResponsiveToolbarProps {
   compactBreakpoint?: number
   /** Additional CSS classes for the toolbar container. */
   className?: string
+  /** Whether the toolbar is disabled and non-interactive. */
+  disabled?: boolean
 }
 
 /**
@@ -39,6 +41,7 @@ export function ResponsiveToolbar({
   children,
   compactBreakpoint = DEFAULT_COMPACT_BREAKPOINT,
   className,
+  disabled = false,
 }: ResponsiveToolbarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [isCompact, setIsCompact] = useState(false)
@@ -83,7 +86,8 @@ export function ResponsiveToolbar({
       <div
         ref={containerRef}
         className={cn(
-          'flex items-center justify-center gap-2 flex-wrap py-4 px-2 -my-3',
+          'flex items-center justify-center gap-2 flex-wrap py-4 px-2 -my-3 transition-opacity duration-200',
+          disabled && 'opacity-40 pointer-events-none grayscale-[0.5]',
           className
         )}
       >

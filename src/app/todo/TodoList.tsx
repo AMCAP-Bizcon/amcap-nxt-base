@@ -177,19 +177,8 @@ export function TodoList({
     }
 
     useEffect(() => {
-        const handleKd = (e: KeyboardEvent) => {
-            if (mode !== 'idle' && !isSaving) {
-                if (e.key === 'Enter') { e.preventDefault(); void handleSaveList(); }
-                else if (e.key === 'Escape') { e.preventDefault(); handleDiscardList(); }
-            } else if (detailsMode !== 'idle' && !detailsPanelRef.current?.isSaving && selectedId) {
-                if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void detailsPanelRef.current?.handleSave(); }
-                else if (e.key === 'Escape') { e.preventDefault(); detailsPanelRef.current?.handleDiscard(); }
-            }
-        }
-        window.addEventListener('keydown', handleKd)
-        return () => window.removeEventListener('keydown', handleKd)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mode, isSaving, detailsMode, selectedId])
+        // Keyboard shortcuts for Save/Discard were removed as per user request.
+    }, [])
 
     const handleSelectToggle = (id: number) => {
         setSelectedTodoIds(prev => prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id])
@@ -252,13 +241,13 @@ export function TodoList({
         </>
     ) : (
         <>
-            <ToolbarButton variant="outline" onClick={handleDiscardList} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard (Esc)" />
-            <ToolbarButton variant="outline" onClick={handleSaveList} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save (Enter)'} />
+            <ToolbarButton variant="outline" onClick={handleDiscardList} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard" />
+            <ToolbarButton variant="outline" onClick={handleSaveList} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save'} />
         </>
     )
 
     const listSlot = (
-        <StandardList toolbarActions={listToolbarActions}>
+        <StandardList toolbarActions={listToolbarActions} disabledToolbar={!!selectedId}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={displayTodos.map(t => t.id)} strategy={verticalListSortingStrategy}>
                     <ul className={cn("space-y-3", detailsMode === 'editing' ? 'pointer-events-none opacity-50 transition-opacity' : '')}>

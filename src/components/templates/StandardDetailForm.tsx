@@ -8,6 +8,8 @@ interface StandardDetailFormProps {
     headerActions?: ReactNode;
     formActions?: ReactNode;
     onClose: () => void;
+    /** When true, hides the close button entirely. */
+    hideClose?: boolean;
     children: ReactNode;
 }
 
@@ -15,7 +17,7 @@ interface StandardDetailFormProps {
  * A wrapper for the detail pane in a Master/Detail pattern.
  * Includes a header with title, close button, and slots for form and header actions.
  */
-export function StandardDetailForm({ title, headerActions, formActions, onClose, children }: StandardDetailFormProps) {
+export function StandardDetailForm({ title, headerActions, formActions, onClose, hideClose = false, children }: StandardDetailFormProps) {
     return (
         <div className="w-full h-full bg-card flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
             {/* Unified Top Toolbar */}
@@ -28,12 +30,14 @@ export function StandardDetailForm({ title, headerActions, formActions, onClose,
                         {formActions}
                     </ResponsiveToolbar>
                 )}
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                        <X className="h-5 w-5" />
-                        <span className="sr-only">Close</span>
-                    </Button>
-                </div>
+                {!hideClose && (
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                            <X className="h-5 w-5" />
+                            <span className="sr-only">Close</span>
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {/* Title Section */}
