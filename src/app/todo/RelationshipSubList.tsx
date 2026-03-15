@@ -8,7 +8,7 @@ import { CheckSquare, Trash2, Edit2, Save, XCircle, PlusCircle, Check, MoveVerti
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
-import { createTodo, updateTodoTexts, toggleTodosDoneStatus } from './actions'
+import { createTodo, updateTodoTexts, toggleTodosDoneStatus, updateTodoSequence } from './actions'
 import { forwardRef, useImperativeHandle } from 'react'
 import {
     DndContext,
@@ -147,6 +147,23 @@ export const RelationshipSubList = forwardRef<RelationshipSubListRef, Relationsh
                     onLinksChanged(newIds)
                 }
             } else if (mode === 'reordering') {
+                // Collect sequences of todos represented in this sublist
+                const relevantTodos = localLinkedIds
+                    .map(id => allTodosMap.get(id))
+                    .filter((t): t is Todo => !!t);
+                
+                const availableSequences = relevantTodos
+                    .map(t => t.sequence)
+                    .sort((a, b) => a - b);
+                
+                const updates = localLinkedIds.map((id, index) => ({
+                    id: id,
+                    sequence: availableSequences[index]
+                }));
+
+                if (updates.length > 0) {
+                    await updateTodoSequence(updates);
+                }
                 onLinksChanged(localLinkedIds)
             }
             setMode('idle')

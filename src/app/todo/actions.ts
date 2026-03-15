@@ -13,33 +13,28 @@ import { requireUser, createClient } from '@/utils/supabase/server'
  * @param {Pick<Todo, 'images' | 'files'>[]} todosToDelete - The list of todos containing media to delete
  */
 async function deleteAssociatedMedia(supabase: any, todosToDelete: Pick<Todo, 'images' | 'files'>[]) {
-    const urlsToDelete: string[] = [];
+    const pathsToDelete: string[] = [];
 
     for (const todo of todosToDelete) {
         if (Array.isArray(todo.images)) {
-            urlsToDelete.push(...todo.images);
+            for (const img of todo.images) {
+                if (img && typeof img === 'object' && 'path' in img && typeof img.path === 'string') {
+                    pathsToDelete.push(img.path);
+                }
+            }
         }
         if (Array.isArray(todo.files)) {
             for (const file of todo.files) {
-                if (file && typeof file === 'object' && 'url' in file && typeof file.url === 'string') {
-                    urlsToDelete.push(file.url);
+                if (file && typeof file === 'object' && 'path' in file && typeof file.path === 'string') {
+                    pathsToDelete.push(file.path);
                 }
             }
         }
     }
 
-    if (urlsToDelete.length === 0) return;
+    if (pathsToDelete.length === 0) return;
 
-    const pathsToDelete = urlsToDelete
-        .map(url => {
-            const match = url.match(/todo-media\/(.+)$/);
-            return match ? match[1] : null;
-        })
-        .filter((path): path is string => path !== null);
-
-    if (pathsToDelete.length > 0) {
-        await supabase.storage.from('todo-media').remove(pathsToDelete);
-    }
+    await supabase.storage.from('todo-media').remove(pathsToDelete);
 }
 import { eq, and, or, inArray, sql } from 'drizzle-orm'
 
@@ -118,15 +113,27 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
     // 1. Verify who is making the request
     const user = await requireUser()
 
-    // 2. Perform sequential updates within a single transaction to prevent connection pool exhaustion
-    await db.transaction(async (tx) => {
-        for (const item of items) {
-            await tx
-                .update(todos)
-                .set({ sequence: item.sequence })
-                .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
-        }
-    })
+    if (items.length === 0) return
+
+    // 2. Perform optimistic bulk update using a CASE expression
+    const sqlChunks: any[] = []
+    sqlChunks.push(sql`(case`)
+    for (const item of items) {
+        sqlChunks.push(sql`when ${todos.id} = ${item.id} then ${item.sequence}::integer`)
+    }
+    sqlChunks.push(sql`else ${todos.sequence} end)`)
+
+    const finalSql = sql.join(sqlChunks, sql.raw(' '))
+
+    await db
+        .update(todos)
+        .set({ sequence: finalSql })
+        .where(
+            and(
+                inArray(todos.id, items.map((i) => i.id)),
+                eq(todos.userId, user.id)
+            )
+        )
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')
@@ -143,15 +150,27 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
 
-    // 2. Perform sequential updates within a single transaction to prevent connection pool exhaustion
-    await db.transaction(async (tx) => {
-        for (const item of items) {
-            await tx
-                .update(todos)
-                .set({ text: item.text })
-                .where(and(eq(todos.id, item.id), eq(todos.userId, user.id)))
-        }
-    })
+    if (items.length === 0) return
+
+    // 2. Perform optimistic bulk update using a CASE expression
+    const sqlChunks: any[] = []
+    sqlChunks.push(sql`(case`)
+    for (const item of items) {
+        sqlChunks.push(sql`when ${todos.id} = ${item.id} then ${item.text}::text`)
+    }
+    sqlChunks.push(sql`else ${todos.text} end)`)
+
+    const finalSql = sql.join(sqlChunks, sql.raw(' '))
+
+    await db
+        .update(todos)
+        .set({ text: finalSql })
+        .where(
+            and(
+                inArray(todos.id, items.map((i) => i.id)),
+                eq(todos.userId, user.id)
+            )
+        )
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')
@@ -246,36 +265,32 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
             .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
 
         if (existingTodo) {
-            const urlsToDelete: string[] = [];
+            const pathsToDelete: string[] = [];
 
             if (details.images !== undefined) {
-                const oldImages = Array.isArray(existingTodo.images) ? existingTodo.images as string[] : [];
-                const newImages = Array.isArray(details.images) ? details.images as string[] : [];
-                urlsToDelete.push(...oldImages.filter(img => !newImages.includes(img)));
-            }
-
-            if (details.files !== undefined) {
-                const oldFiles = Array.isArray(existingTodo.files) ? existingTodo.files as any[] : [];
-                const newFiles = Array.isArray(details.files) ? details.files as any[] : [];
-
-                oldFiles.forEach(oldFile => {
-                    if (oldFile && oldFile.url && !newFiles.some(nf => nf.url === oldFile.url)) {
-                        urlsToDelete.push(oldFile.url);
+                const oldImages = Array.isArray(existingTodo.images) ? existingTodo.images as { url: string, path: string }[] : [];
+                const newImages = Array.isArray(details.images) ? details.images as { url: string, path: string }[] : [];
+                
+                oldImages.forEach(oldImg => {
+                    if (oldImg && oldImg.path && !newImages.some(ni => ni.path === oldImg.path)) {
+                        pathsToDelete.push(oldImg.path);
                     }
                 });
             }
 
-            if (urlsToDelete.length > 0) {
-                const pathsToDelete = urlsToDelete
-                    .map(url => {
-                        const match = url.match(/todo-media\/(.+)$/);
-                        return match ? match[1] : null;
-                    })
-                    .filter((path): path is string => path !== null);
+            if (details.files !== undefined) {
+                const oldFiles = Array.isArray(existingTodo.files) ? existingTodo.files as { url: string, path: string }[] : [];
+                const newFiles = Array.isArray(details.files) ? details.files as { url: string, path: string }[] : [];
 
-                if (pathsToDelete.length > 0) {
-                    await supabase.storage.from('todo-media').remove(pathsToDelete);
-                }
+                oldFiles.forEach(oldFile => {
+                    if (oldFile && oldFile.path && !newFiles.some(nf => nf.path === oldFile.path)) {
+                        pathsToDelete.push(oldFile.path);
+                    }
+                });
+            }
+
+            if (pathsToDelete.length > 0) {
+                await supabase.storage.from('todo-media').remove(pathsToDelete);
             }
         }
     }
@@ -304,44 +319,75 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
     const user = await requireUser()
 
     await db.transaction(async (tx) => {
-        // 1. Delete all existing relationships involving this todoId
-        // Either where parentId = todoId OR childId = todoId
-        await tx.delete(todoRelationships).where(
-            and(
-                eq(todoRelationships.userId, user.id),
-                or(
-                    eq(todoRelationships.parentId, todoId),
-                    eq(todoRelationships.childId, todoId)
+        // 1. Fetch current relationships involving this todoId
+        const currentRelationships = await tx
+            .select()
+            .from(todoRelationships)
+            .where(
+                and(
+                    eq(todoRelationships.userId, user.id),
+                    or(
+                        eq(todoRelationships.parentId, todoId),
+                        eq(todoRelationships.childId, todoId)
+                    )
                 )
-            )
-        );
+            );
 
-        // 2. Insert the new ones
-        const newEdges: { parentId: number; childId: number; userId: string }[] = [];
+        // Map them to comparison strings "parentId-childId"
+        const currentSet = new Set(currentRelationships.map(r => `${r.parentId}-${r.childId}`));
 
+        // 2. Determine target relationships
+        const targetSet = new Set<string>();
+        for (const p of parentIds) targetSet.add(`${p}-${todoId}`);
+        for (const c of childIds) targetSet.add(`${todoId}-${c}`);
+
+        // 3. Calculate diffs
+        const toDelete: { parentId: number, childId: number }[] = [];
+        for (const r of currentRelationships) {
+            if (!targetSet.has(`${r.parentId}-${r.childId}`)) {
+                toDelete.push({ parentId: r.parentId, childId: r.childId });
+            }
+        }
+
+        const toInsert: { parentId: number, childId: number, userId: string }[] = [];
         for (const p of parentIds) {
-            newEdges.push({ parentId: p, childId: todoId, userId: user.id });
+            if (!currentSet.has(`${p}-${todoId}`)) {
+                toInsert.push({ parentId: p, childId: todoId, userId: user.id });
+            }
         }
         for (const c of childIds) {
-            newEdges.push({ parentId: todoId, childId: c, userId: user.id });
+            if (!currentSet.has(`${todoId}-${c}`)) {
+                toInsert.push({ parentId: todoId, childId: c, userId: user.id });
+            }
         }
 
-        if (newEdges.length > 0) {
-            await tx.insert(todoRelationships).values(newEdges);
+        // 4. Execute optimized updates
+        if (toDelete.length > 0) {
+            // Delete specific mismatched edges
+            for (const rel of toDelete) {
+                await tx.delete(todoRelationships).where(
+                    and(
+                        eq(todoRelationships.userId, user.id),
+                        eq(todoRelationships.parentId, rel.parentId),
+                        eq(todoRelationships.childId, rel.childId)
+                    )
+                );
+            }
         }
 
-        // 3. Cycle validation via Recursive CTE
-        // If there's a cycle, the graph now contains a path from todoId back to todoId.
+        if (toInsert.length > 0) {
+            await tx.insert(todoRelationships).values(toInsert);
+        }
+
+        // 5. Cycle validation via Recursive CTE
         const cycleCheck = await tx.execute(sql`
             WITH RECURSIVE search_graph(child_id) AS (
-                -- Base case: children of todoId
                 SELECT child_id
                 FROM todo_relationships
                 WHERE parent_id = ${todoId} AND user_id = ${user.id}
                 
                 UNION
                 
-                -- Recursive step: children of the current nodes
                 SELECT r.child_id
                 FROM todo_relationships r
                 INNER JOIN search_graph sg ON r.parent_id = sg.child_id

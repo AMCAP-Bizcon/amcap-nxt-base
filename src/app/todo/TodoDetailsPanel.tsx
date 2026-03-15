@@ -40,8 +40,8 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const [details, setDetails] = useState<{
         text: string;
         description: string;
-        images: string[];
-        files: { name: string, url: string }[];
+        images: { url: string; path: string }[];
+        files: { name: string; url: string; path: string }[];
         parentIds: number[];
         childIds: number[];
         isPinned: boolean;
@@ -72,26 +72,48 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
     const supabase = createClient()
 
+    const allTodosMap = useMemo(() => new Map(allTodos.map(t => [t.id, t])), [allTodos]);
+
     useEffect(() => {
-        if (todo && todo.id !== currentTodoId.current) {
+        if (todo) {
+            const isSameTodo = currentTodoId.current === todo.id;
             currentTodoId.current = todo.id;
-            setDetails({
-                text: todo.text || '',
-                description: todo.description || '',
-                images: Array.isArray(todo.images) ? todo.images : [],
-                files: Array.isArray(todo.files) ? todo.files : [],
-                parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
-                childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
-                isPinned: todo.isPinned ?? false,
+            
+            setDetails(prev => {
+                const newParentIds = relationships
+                    .filter(r => r.childId === todo.id)
+                    .sort((a, b) => (allTodosMap.get(a.parentId)?.sequence ?? 0) - (allTodosMap.get(b.parentId)?.sequence ?? 0))
+                    .map(r => r.parentId);
+                
+                const newChildIds = relationships
+                    .filter(r => r.parentId === todo.id)
+                    .sort((a, b) => (allTodosMap.get(a.childId)?.sequence ?? 0) - (allTodosMap.get(b.childId)?.sequence ?? 0))
+                    .map(r => r.childId);
+
+                return {
+                    text: isSameTodo ? prev.text : (todo.text || ''),
+                    description: isSameTodo ? prev.description : (todo.description || ''),
+                    images: Array.isArray(todo.images) ? todo.images as { url: string; path: string }[] : [],
+                    files: Array.isArray(todo.files) ? todo.files as { name: string; url: string; path: string }[] : [],
+                    parentIds: newParentIds,
+                    childIds: newChildIds,
+                    isPinned: todo.isPinned ?? false,
+                }
             })
         }
-    }, [todo, relationships])
+    }, [todo, relationships, allTodosMap])
 
     if (!todo) return null
 
     const handleSave = async () => {
         setIsSaving(true)
         try {
+            // Ensure any sublist in-progress changes (like reordering) are persisted
+            await Promise.all([
+                parentsListRef.current?.saveIfUnsaved(),
+                childrenListRef.current?.saveIfUnsaved()
+            ]);
+
             await Promise.all([
                 updateTodoDetails(todo.id, {
                     text: details.text,
@@ -110,8 +132,6 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             setIsSaving(false)
         }
     }
-
-    const allTodosMap = useMemo(() => new Map(allTodos.map(t => [t.id, t])), [allTodos]);
 
     const simulatedGraph = useMemo(() => {
         if (!todo) return [];
@@ -155,9 +175,9 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         setDetails(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }))
     }
 
-    const addFile = (name: string, url: string) => {
-        if (name.trim() && url.trim()) {
-            setDetails(prev => ({ ...prev, files: [...prev.files, { name: name.trim(), url: url.trim() }] }))
+    const addFile = (name: string, url: string, path: string) => {
+        if (name.trim() && url.trim() && path.trim()) {
+            setDetails(prev => ({ ...prev, files: [...prev.files, { name: name.trim(), url: url.trim(), path: path.trim() }] }))
         }
     }
 
@@ -170,8 +190,8 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             setDetails({
                 text: todo.text || '',
                 description: todo.description || '',
-                images: Array.isArray(todo.images) ? todo.images : [],
-                files: Array.isArray(todo.files) ? todo.files : [],
+                images: Array.isArray(todo.images) ? todo.images as { url: string; path: string }[] : [],
+                files: Array.isArray(todo.files) ? todo.files as { name: string; url: string; path: string }[] : [],
                 parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
                 childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
                 isPinned: todo.isPinned ?? false,
@@ -209,8 +229,8 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             if (uploadError) throw uploadError;
 
             const { data } = supabase.storage.from('todo-media').getPublicUrl(fileName);
-
-            setDetails(prev => ({ ...prev, images: [...prev.images, data.publicUrl] }));
+            
+            setDetails(prev => ({ ...prev, images: [...prev.images, { url: data.publicUrl, path: fileName }] }));
             if (readOnly) onEnterEditMode?.()
         } catch (error) {
             console.error('Failed to upload image:', error);
@@ -240,7 +260,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
             const { data } = supabase.storage.from('todo-media').getPublicUrl(fileName);
 
-            addFile(originalName, data.publicUrl);
+            addFile(originalName, data.publicUrl, fileName);
             if (readOnly) onEnterEditMode?.()
         } catch (error) {
             console.error('Failed to upload file:', error);
@@ -372,7 +392,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     <div className="grid grid-cols-2 gap-3 mb-4">
                         {details.images.map((img, i) => (
                             <div key={i} className="relative group rounded-md border border-border/50 overflow-hidden bg-muted aspect-video flex-shrink-0 shadow-sm">
-                                <img src={img} alt={`Attached ${i}`} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Invalid+Image' }} />
+                                <img src={img.url} alt={`Attached ${i}`} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Invalid+Image' }} />
                                 {!readOnly && (
                                     <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
                                         <X className="h-3 w-3" />

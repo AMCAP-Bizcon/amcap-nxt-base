@@ -27,7 +27,7 @@ export async function login(formData: FormData) {
 
   if (error) {
     console.error("Login Error:", error.message)
-    return redirect('/login?error=Could not authenticate user')
+    return redirect(`/login?error=${encodeURIComponent(error.message)}`)
   }
 
   // 3. Refresh the cache for the layout (so the navbar updates)
@@ -55,7 +55,7 @@ export async function signup(formData: FormData) {
 
   if (error) {
     console.error("Signup Error:", error.message)
-    return redirect('/login?error=Could not create user')
+    return redirect(`/login?error=${encodeURIComponent(error.message)}`)
   }
 
   revalidatePath('/', 'layout')
