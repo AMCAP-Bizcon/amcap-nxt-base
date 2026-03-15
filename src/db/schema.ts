@@ -36,3 +36,45 @@ export const todoRelationships = pgTable('todo_relationships', {
 
 export type Todo = InferSelectModel<typeof todos>;
 export type TodoRelationship = InferSelectModel<typeof todoRelationships>;
+
+/**
+ * `profiles` Database Table Schema Definition.
+ *
+ * Mirrors Supabase Auth users into the public schema so Drizzle ORM can query them.
+ * Populated automatically via a Postgres trigger on `auth.users` insert.
+ *
+ * Columns:
+ * - `id`: UUID primary key matching `auth.users.id`.
+ * - `email`: The user's email address (synced from auth).
+ * - `displayName`: An editable display/full name.
+ * - `phone`: An editable phone number.
+ * - `createdAt`: Timestamp indicating when the profile was created.
+ */
+export const profiles = pgTable('profiles', {
+    id: uuid('id').primaryKey(),
+    email: text('email').notNull(),
+    displayName: text('display_name'),
+    phone: text('phone'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+/**
+ * `user_management_relationships` Database Table Schema Definition.
+ *
+ * Self-referential join table that models manager ↔ managed-user relationships.
+ * A row means: the user `managerId` manages the account of `managedUserId`.
+ *
+ * Columns:
+ * - `managerId`: FK → profiles.id (the manager).
+ * - `managedUserId`: FK → profiles.id (the managed user).
+ * Composite PK on (managerId, managedUserId).
+ */
+export const userManagementRelationships = pgTable('user_management_relationships', {
+    managerId: uuid('manager_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    managedUserId: uuid('managed_user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+}, (t) => [
+    primaryKey({ columns: [t.managerId, t.managedUserId] })
+]);
+
+export type Profile = InferSelectModel<typeof profiles>;
+export type UserManagementRelationship = InferSelectModel<typeof userManagementRelationships>;

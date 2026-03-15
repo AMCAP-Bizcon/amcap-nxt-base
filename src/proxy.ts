@@ -64,7 +64,7 @@ export default async function proxy(request: NextRequest) {
 
   // 2. Route Protection (The "Bouncer" Logic)
   // If user tries to go to /todo without a session, bounce them to login
-  if (request.nextUrl.pathname.startsWith('/todo') && !user) {
+  if ((request.nextUrl.pathname.startsWith('/todo') || request.nextUrl.pathname.startsWith('/users')) && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

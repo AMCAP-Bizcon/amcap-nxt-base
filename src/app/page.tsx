@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ListTodo } from 'lucide-react';
+import { ListTodo, Users } from 'lucide-react';
 
 /**
  * Home Component
@@ -29,6 +29,17 @@ export default async function Home() {
             <ListTodo className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 transition-transform group-hover:scale-110 duration-300" />
             <span className="text-xs sm:text-sm font-medium">
               To Do
+            </span>
+          </Link>
+
+          <Link
+            href="/users"
+            className="flex flex-col items-center justify-center gap-3 group focus:outline-none w-full aspect-square max-w-[6.5rem] sm:max-w-[7.5rem] rounded-[1.25rem] sm:rounded-[1.5rem] border border-emerald-500/30 bg-background text-emerald-500 shadow-sm hover:border-emerald-500/60 hover:bg-emerald-500/5 dark:hover:bg-emerald-500/10 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] transition-all duration-300 ease-out"
+            aria-label="Open Users App"
+          >
+            <Users className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 transition-transform group-hover:scale-110 duration-300" />
+            <span className="text-xs sm:text-sm font-medium">
+              Users
             </span>
           </Link>
 
