@@ -11,6 +11,7 @@ import { createClient } from '@/utils/supabase/client'
 import { RelationshipSubList, type RelationshipSubListRef } from './RelationshipSubList'
 import { StandardDetailForm } from '@/components/templates/StandardDetailForm'
 import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
+import { ImageViewer } from '@/components/ui/image-viewer'
 
 export interface TodoDetailsPanelRef {
     handleSave: () => Promise<void>;
@@ -58,6 +59,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const parentsListRef = useRef<RelationshipSubListRef>(null)
     const childrenListRef = useRef<RelationshipSubListRef>(null)
     const currentTodoId = useRef<number | null>(null)
+    const [viewerState, setViewerState] = useState({ open: false, index: 0 })
 
     /** Recalculates sublistBusy whenever either sublist reports a mode change. */
     const handleChildrenModeChange = useCallback((mode: string) => {
@@ -391,10 +393,17 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 {details.images.length > 0 ? (
                     <div className="grid grid-cols-2 gap-3 mb-4">
                         {details.images.map((img, i) => (
-                            <div key={i} className="relative group rounded-md border border-border/50 overflow-hidden bg-muted aspect-video flex-shrink-0 shadow-sm">
+                            <div 
+                                key={i} 
+                                className="relative group rounded-md border border-border/50 overflow-hidden bg-muted aspect-video flex-shrink-0 shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                                onClick={() => setViewerState({ open: true, index: i })}
+                            >
                                 <img src={img.url} alt={`Attached ${i}`} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Invalid+Image' }} />
                                 {!readOnly && (
-                                    <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); removeImage(i); }} 
+                                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+                                    >
                                         <X className="h-3 w-3" />
                                     </button>
                                 )}
@@ -443,6 +452,13 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     </div>
                 </div>
             )}
+
+            <ImageViewer 
+                images={details.images}
+                initialIndex={viewerState.index}
+                open={viewerState.open}
+                onOpenChange={(open) => setViewerState(prev => ({ ...prev, open }))}
+            />
         </StandardDetailForm>
     )
 })
