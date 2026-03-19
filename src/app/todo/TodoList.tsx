@@ -28,10 +28,15 @@ import { MasterDetailLayout } from '@/components/templates/MasterDetailLayout'
 import { StandardList } from '@/components/templates/StandardList'
 import { useRouter, usePathname } from 'next/navigation'
 
-import { type Todo, type TodoRelationship } from '@/db/schema'
+import { type Todo, type TodoRelationship, type Organization, type TodoOrganization } from '@/db/schema'
+
+export type TodoWithMedia = Todo & {
+    images: { url: string; path: string }[];
+    files: { name?: string; url: string; path: string }[];
+};
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 
-function SortableItem({ id, todo, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle }: { id: number, todo: Todo, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void }) {
+function SortableItem({ id, todo, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle }: { id: number, todo: TodoWithMedia, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
 
     const style = { transform: CSS.Transform.toString(transform), transition }
@@ -58,11 +63,15 @@ function SortableItem({ id, todo, isReordering, isEditing, isIdle, isCurrentlyEd
 export function TodoList({ 
     initialTodos, 
     initialRelationships, 
+    initialOrganizations,
+    initialTodoOrgs,
     selectedId, 
     activeTab 
 }: { 
-    initialTodos: Todo[], 
+    initialTodos: TodoWithMedia[], 
     initialRelationships: TodoRelationship[],
+    initialOrganizations: Organization[],
+    initialTodoOrgs: TodoOrganization[],
     selectedId: number | null,
     activeTab: string
 }) {
@@ -71,6 +80,8 @@ export function TodoList({
 
     const [todos, setTodos] = useState(initialTodos)
     const [relationships, setRelationships] = useState(initialRelationships)
+    const [organizations, setOrganizations] = useState(initialOrganizations)
+    const [todoOrgs, setTodoOrgs] = useState(initialTodoOrgs)
     const [mode, setMode] = useState<'idle' | 'reordering' | 'editing' | 'done' | 'delete' | 'creating'>('idle')
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null)
     const [selectedTodoIds, setSelectedTodoIds] = useState<number[]>([])
@@ -103,6 +114,8 @@ export function TodoList({
         if (!pendingUpdate.current) {
             setTodos(initialTodos)
             setRelationships(initialRelationships)
+            setOrganizations(initialOrganizations)
+            setTodoOrgs(initialTodoOrgs)
         }
         if (mode === 'idle') {
             pendingUpdate.current = false;
@@ -110,7 +123,7 @@ export function TodoList({
         if (mode === 'idle') {
             setNewTodoText('')
         }
-    }, [initialTodos, initialRelationships, mode])
+    }, [initialTodos, initialRelationships, initialOrganizations, initialTodoOrgs, mode])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -276,6 +289,8 @@ export function TodoList({
             todo={todos.find(t => t.id === selectedId) || null}
             allTodos={todos}
             relationships={relationships}
+            allOrganizations={organizations}
+            todoOrgs={todoOrgs}
             readOnly={detailsMode === 'idle'}
             onEnterEditMode={() => setDetailsMode('editing')}
             onClose={handleCloseDetails}

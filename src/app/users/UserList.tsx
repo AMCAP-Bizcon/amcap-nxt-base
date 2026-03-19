@@ -5,12 +5,14 @@ import { MasterDetailLayout } from '@/components/templates/MasterDetailLayout'
 import { StandardList } from '@/components/templates/StandardList'
 import { UserDetailsPanel } from './UserDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
-import { type Profile, type UserManagementRelationship } from '@/db/schema'
+import { type Profile, type UserManagementRelationship, type Organization, type UserOrganization } from '@/db/schema'
 import { cn } from '@/lib/utils'
 
 interface UserListProps {
     initialProfiles: Profile[]
     initialRelationships: UserManagementRelationship[]
+    initialOrganizations: Organization[]
+    initialUserOrgs: UserOrganization[]
     selectedId: string | null
     activeTab: string
 }
@@ -18,6 +20,8 @@ interface UserListProps {
 export function UserList({
     initialProfiles,
     initialRelationships,
+    initialOrganizations,
+    initialUserOrgs,
     selectedId,
     activeTab
 }: UserListProps) {
@@ -26,12 +30,16 @@ export function UserList({
 
     const [profiles, setProfiles] = useState(initialProfiles)
     const [relationships, setRelationships] = useState(initialRelationships)
+    const [organizations, setOrganizations] = useState(initialOrganizations)
+    const [userOrgs, setUserOrgs] = useState(initialUserOrgs)
     const [detailsMode, setDetailsMode] = useState<'idle' | 'editing'>('idle')
 
     useEffect(() => {
         setProfiles(initialProfiles)
         setRelationships(initialRelationships)
-    }, [initialProfiles, initialRelationships])
+        setOrganizations(initialOrganizations)
+        setUserOrgs(initialUserOrgs)
+    }, [initialProfiles, initialRelationships, initialOrganizations, initialUserOrgs])
 
     const handleOpenDetails = (id: string) => {
         router.push(`${pathname}?id=${id}`)
@@ -85,6 +93,8 @@ export function UserList({
             profile={profiles.find(p => p.id === selectedId) || null}
             allProfiles={profiles}
             relationships={relationships}
+            allOrganizations={organizations}
+            userOrgs={userOrgs}
             readOnly={detailsMode === 'idle'}
             onEnterEditMode={() => setDetailsMode('editing')}
             onClose={handleCloseDetails}

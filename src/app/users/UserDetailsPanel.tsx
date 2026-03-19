@@ -6,13 +6,16 @@ import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { Edit2, XCircle, Save, User as UserIcon, Phone, Mail, Calendar } from 'lucide-react'
 import { StandardDetailForm } from '@/components/templates/StandardDetailForm'
 import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
-import { updateProfile, updateUserManagementRelationships } from './actions'
+import { updateProfile, updateUserManagementRelationships, updateUserOrganizations } from './actions'
 import { UserRelationshipSubList, type UserRelationshipSubListRef } from './UserRelationshipSubList'
+import { UserOrganizationsSublist, type UserOrganizationsSublistRef } from './UserOrganizationsSublist'
 
 interface UserDetailsPanelProps {
     profile: Profile | null
     allProfiles: Profile[]
     relationships: UserManagementRelationship[]
+    allOrganizations: import('@/db/schema').Organization[]
+    userOrgs: import('@/db/schema').UserOrganization[]
     readOnly?: boolean
     onEnterEditMode?: () => void
     onClose: () => void
@@ -26,6 +29,8 @@ export function UserDetailsPanel({
     profile,
     allProfiles,
     relationships,
+    allOrganizations,
+    userOrgs,
     readOnly = false,
     onEnterEditMode,
     onClose,
@@ -40,15 +45,18 @@ export function UserDetailsPanel({
         phone: string;
         managerIds: string[];
         managedUserIds: string[];
-    }>({ displayName: '', phone: '', managerIds: [], managedUserIds: [] })
+        organizationIds: number[];
+    }>({ displayName: '', phone: '', managerIds: [], managedUserIds: [], organizationIds: [] })
 
     const [sublistBusy, setSublistBusy] = useState(false)
     const managersSublistMode = useRef<string>('idle')
     const managedBySublistMode = useRef<string>('idle')
+    const orgsSublistMode = useRef<string>('idle')
     const currentProfileId = useRef<string | null>(null)
 
     const managersListRef = useRef<UserRelationshipSubListRef>(null)
     const managedByListRef = useRef<UserRelationshipSubListRef>(null)
+    const orgsListRef = useRef<UserOrganizationsSublistRef>(null)
 
     useEffect(() => {
         if (profile && profile.id !== currentProfileId.current) {
@@ -58,18 +66,24 @@ export function UserDetailsPanel({
                 phone: profile.phone || '',
                 managerIds: relationships.filter(r => r.managedUserId === profile.id).map(r => r.managerId),
                 managedUserIds: relationships.filter(r => r.managerId === profile.id).map(r => r.managedUserId),
+                organizationIds: userOrgs.filter(r => r.userId === profile.id).map(r => r.organizationId),
             })
         }
-    }, [profile, relationships])
+    }, [profile, relationships, userOrgs])
 
     const handleManagersModeChange = useCallback((mode: string) => {
         managersSublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || managedBySublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || managedBySublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle')
     }, [])
 
     const handleManagedByModeChange = useCallback((mode: string) => {
         managedBySublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle')
+    }, [])
+
+    const handleOrgsModeChange = useCallback((mode: string) => {
+        orgsSublistMode.current = mode
+        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle' || managedBySublistMode.current !== 'idle')
     }, [])
 
     if (!profile) return null
@@ -82,7 +96,8 @@ export function UserDetailsPanel({
                     displayName: details.displayName,
                     phone: details.phone,
                 }),
-                updateUserManagementRelationships(profile.id, details.managerIds, details.managedUserIds)
+                updateUserManagementRelationships(profile.id, details.managerIds, details.managedUserIds),
+                updateUserOrganizations(profile.id, details.organizationIds)
             ])
             onSaved()
         } catch (error) {
@@ -100,12 +115,14 @@ export function UserDetailsPanel({
                 phone: profile.phone || '',
                 managerIds: relationships.filter(r => r.managedUserId === profile.id).map(r => r.managerId),
                 managedUserIds: relationships.filter(r => r.managerId === profile.id).map(r => r.managedUserId),
+                organizationIds: userOrgs.filter(r => r.userId === profile.id).map(r => r.organizationId),
             });
         }
         onDiscard();
     }
 
     const allProfilesMap = useMemo(() => new Map(allProfiles.map(p => [p.id, p])), [allProfiles]);
+    const allOrganizationsMap = useMemo(() => new Map(allOrganizations.map(o => [o.id, o])), [allOrganizations]);
 
     const simulatedGraph = useMemo(() => {
         if (!profile) return [];
@@ -244,6 +261,21 @@ export function UserDetailsPanel({
                                     readOnly={readOnly}
                                     onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, managedUserIds: newIds }))}
                                     onModeChange={handleManagedByModeChange}
+                                />
+                            )
+                        },
+                        {
+                            id: 'organizations',
+                            label: 'Organizations',
+                            content: (
+                                <UserOrganizationsSublist
+                                    ref={orgsListRef}
+                                    linkedIds={details.organizationIds}
+                                    availableOrganizations={allOrganizations}
+                                    allOrganizationsMap={allOrganizationsMap}
+                                    readOnly={readOnly}
+                                    onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, organizationIds: newIds }))}
+                                    onModeChange={handleOrgsModeChange}
                                 />
                             )
                         }

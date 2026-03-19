@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { profiles, userManagementRelationships } from '@/db/schema'
+import { profiles, userManagementRelationships, organizations, userOrganizations } from '@/db/schema'
 import { createClient } from '@/utils/supabase/server'
 import { UserList } from './UserList'
 
@@ -27,11 +27,16 @@ export default async function UsersPage(props: {
         .select()
         .from(userManagementRelationships)
 
+    const allOrganizations = await db.select().from(organizations).orderBy(organizations.name);
+    const allUserOrgs = await db.select().from(userOrganizations);
+
     return (
         <div className="flex justify-center p-8 w-full flex-1 min-h-0 bg-transparent">
             <UserList
                 initialProfiles={allProfiles}
                 initialRelationships={allRelationships}
+                initialOrganizations={allOrganizations}
+                initialUserOrgs={allUserOrgs}
                 selectedId={selectedId}
                 activeTab={activeTab}
             />

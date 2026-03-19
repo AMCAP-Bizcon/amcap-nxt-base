@@ -91,3 +91,29 @@ export async function updateUserManagementRelationships(userId: string, managerI
 
     revalidatePath('/users');
 }
+
+/**
+ * Updates the organizations a specific user belongs to.
+ * 
+ * @param {string} userId - The UUID of the user
+ * @param {number[]} organizationIds - The IDs of all its organizations
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateUserOrganizations(userId: string, organizationIds: number[]) {
+    await requireUser()
+    const { userOrganizations } = await import('@/db/schema'); // dynamic import or add to top
+
+    await db.transaction(async (tx) => {
+        await tx.delete(userOrganizations).where(eq(userOrganizations.userId, userId));
+
+        if (organizationIds.length > 0) {
+            const values = organizationIds.map(orgId => ({
+                userId,
+                organizationId: orgId
+            }));
+            await tx.insert(userOrganizations).values(values);
+        }
+    });
+
+    revalidatePath('/users');
+}

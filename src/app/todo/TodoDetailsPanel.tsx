@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect, forwardRef, useImperativeHandle, useRef, useMemo, useCallback } from 'react'
-import { type Todo, type TodoRelationship } from '@/db/schema'
+import { type TodoRelationship } from '@/db/schema'
+import { type TodoWithMedia } from './TodoList'
 import { Button } from '@/components/ui/button'
 import { Save, Image as ImageIcon, FileText, Camera, Pin, PinOff, Edit2, XCircle, X } from 'lucide-react'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { updateTodoDetails, updateTodoRelationships } from './actions'
+import { updateTodoDetails, updateTodoRelationships, updateTodoOrganizations } from './actions'
 import { createClient } from '@/utils/supabase/client'
 import { RelationshipSubList, type RelationshipSubListRef } from './RelationshipSubList'
+import { TodoOrganizationsSublist, type TodoOrganizationsSublistRef } from './TodoOrganizationsSublist'
 import { StandardDetailForm } from '@/components/templates/StandardDetailForm'
 import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 import { ImageViewer } from '@/components/ui/image-viewer'
@@ -23,9 +25,11 @@ export interface TodoDetailsPanelRef {
 }
 
 interface TodoDetailsPanelProps {
-    todo: Todo | null
-    allTodos: Todo[]
+    todo: TodoWithMedia | null
+    allTodos: TodoWithMedia[]
     relationships: TodoRelationship[]
+    allOrganizations: import('@/db/schema').Organization[]
+    todoOrgs: import('@/db/schema').TodoOrganization[]
     readOnly?: boolean
     onEnterEditMode?: () => void
     onClose: () => void
@@ -36,7 +40,7 @@ interface TodoDetailsPanelProps {
     onDiscard: () => void
 }
 
-export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, readOnly = false, onEnterEditMode, onClose, onDrillDown, onSaved, activeTab, onTabChange, onDiscard }, ref) => {
+export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanelProps>(({ todo, allTodos, relationships, allOrganizations, todoOrgs, readOnly = false, onEnterEditMode, onClose, onDrillDown, onSaved, activeTab, onTabChange, onDiscard }, ref) => {
     const [isSaving, setIsSaving] = useState(false)
     const [details, setDetails] = useState<{
         text: string;
@@ -46,35 +50,44 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         parentIds: number[];
         childIds: number[];
         isPinned: boolean;
-    }>({ text: '', description: '', images: [], files: [], parentIds: [], childIds: [], isPinned: false })
+        organizationIds: number[];
+    }>({ text: '', description: '', images: [], files: [], parentIds: [], childIds: [], isPinned: false, organizationIds: [] })
 
     const [isUploading, setIsUploading] = useState(false)
     /** Tracks whether any sublist is in a non-idle mode (editing, reordering, etc.). */
     const [sublistBusy, setSublistBusy] = useState(false)
     const childrenSublistMode = useRef<string>('idle')
     const parentsSublistMode = useRef<string>('idle')
+    const orgsSublistMode = useRef<string>('idle')
     const imageInputRef = useRef<HTMLInputElement>(null)
     const captureInputRef = useRef<HTMLInputElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const parentsListRef = useRef<RelationshipSubListRef>(null)
     const childrenListRef = useRef<RelationshipSubListRef>(null)
+    const orgsListRef = useRef<TodoOrganizationsSublistRef>(null)
     const currentTodoId = useRef<number | null>(null)
     const [viewerState, setViewerState] = useState({ open: false, index: 0 })
 
     /** Recalculates sublistBusy whenever either sublist reports a mode change. */
     const handleChildrenModeChange = useCallback((mode: string) => {
         childrenSublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || parentsSublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || parentsSublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle')
     }, [])
 
     const handleParentsModeChange = useCallback((mode: string) => {
         parentsSublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || childrenSublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || childrenSublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle')
+    }, [])
+
+    const handleOrgsModeChange = useCallback((mode: string) => {
+        orgsSublistMode.current = mode
+        setSublistBusy(mode !== 'idle' || childrenSublistMode.current !== 'idle' || parentsSublistMode.current !== 'idle')
     }, [])
 
     const supabase = createClient()
 
     const allTodosMap = useMemo(() => new Map(allTodos.map(t => [t.id, t])), [allTodos]);
+    const allOrganizationsMap = useMemo(() => new Map(allOrganizations.map(o => [o.id, o])), [allOrganizations]);
 
     useEffect(() => {
         if (todo) {
@@ -100,6 +113,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     parentIds: newParentIds,
                     childIds: newChildIds,
                     isPinned: todo.isPinned ?? false,
+                    organizationIds: todoOrgs.filter(r => r.todoId === todo.id).map(r => r.organizationId),
                 }
             })
         }
@@ -113,19 +127,25 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             // Ensure any sublist in-progress changes (like reordering) are persisted
             await Promise.all([
                 parentsListRef.current?.saveIfUnsaved(),
-                childrenListRef.current?.saveIfUnsaved()
+                childrenListRef.current?.saveIfUnsaved(),
+                orgsListRef.current?.saveIfUnsaved()
             ]);
 
-            await Promise.all([
-                updateTodoDetails(todo.id, {
-                    text: details.text,
-                    description: details.description,
-                    images: details.images,
-                    files: details.files,
-                    isPinned: details.isPinned,
-                }),
-                updateTodoRelationships(todo.id, details.parentIds, details.childIds)
-            ])
+            await updateTodoDetails(todo.id, {
+                text: details.text,
+                description: details.description,
+                images: details.images,
+                files: details.files,
+                isPinned: details.isPinned,
+            });
+
+            const relUpdate = await updateTodoRelationships(todo.id, details.parentIds, details.childIds);
+            if (relUpdate && !relUpdate.success) {
+                alert(relUpdate.error || "Failed to save relationships: circular dependency detected.");
+            }
+
+            await updateTodoOrganizations(todo.id, details.organizationIds);
+
             onSaved()
         } catch (error) {
             console.error('Failed to save todo details', error)
@@ -138,8 +158,8 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
     const simulatedGraph = useMemo(() => {
         if (!todo) return [];
         let graph = relationships.filter(r => r.childId !== todo.id && r.parentId !== todo.id);
-        details.parentIds.forEach(pId => graph.push({ parentId: pId, childId: todo.id, userId: '' }));
-        details.childIds.forEach(cId => graph.push({ parentId: todo.id, childId: cId, userId: '' }));
+        details.parentIds.forEach(pId => graph.push({ parentId: pId, childId: todo.id }));
+        details.childIds.forEach(cId => graph.push({ parentId: todo.id, childId: cId }));
         return graph;
     }, [details, relationships, todo]);
 
@@ -197,6 +217,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 parentIds: relationships.filter(r => r.childId === todo.id).map(r => r.parentId),
                 childIds: relationships.filter(r => r.parentId === todo.id).map(r => r.childId),
                 isPinned: todo.isPinned ?? false,
+                organizationIds: todoOrgs.filter(r => r.todoId === todo.id).map(r => r.organizationId),
             });
         }
         onDiscard();
@@ -376,6 +397,21 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                                 onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, parentIds: newIds }))}
                                 onClickTodo={(id) => onDrillDown(id, 'parent')}
                                 onModeChange={handleParentsModeChange}
+                            />
+                        )
+                    },
+                    {
+                        id: 'organizations',
+                        label: 'Organizations',
+                        content: (
+                            <TodoOrganizationsSublist
+                                ref={orgsListRef}
+                                linkedIds={details.organizationIds}
+                                availableOrganizations={allOrganizations}
+                                allOrganizationsMap={allOrganizationsMap}
+                                readOnly={readOnly}
+                                onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, organizationIds: newIds }))}
+                                onModeChange={handleOrgsModeChange}
                             />
                         )
                     }

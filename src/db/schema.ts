@@ -17,8 +17,6 @@ export const todos = pgTable('todos', {
     id: serial('id').primaryKey(),
     text: text('text').notNull(),
     description: text('description'),
-    images: jsonb('images').default('[]').notNull(),
-    files: jsonb('files').default('[]').notNull(),
     done: boolean('done').default(false).notNull(),
     isPinned: boolean('is_pinned').default(false).notNull(),
     userId: uuid('user_id').notNull(),
@@ -26,10 +24,20 @@ export const todos = pgTable('todos', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const todoMedia = pgTable('todo_media', {
+    id: serial('id').primaryKey(),
+    todoId: integer('todo_id').notNull().references(() => todos.id, { onDelete: 'cascade' }),
+    mediaType: text('media_type').notNull(),
+    url: text('url').notNull(),
+    path: text('path').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type TodoMedia = InferSelectModel<typeof todoMedia>;
+
 export const todoRelationships = pgTable('todo_relationships', {
     parentId: integer('parent_id').notNull().references(() => todos.id, { onDelete: 'cascade' }),
     childId: integer('child_id').notNull().references(() => todos.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id').notNull(),
 }, (t) => [
     primaryKey({ columns: [t.parentId, t.childId] })
 ]);
@@ -78,3 +86,37 @@ export const userManagementRelationships = pgTable('user_management_relationship
 
 export type Profile = InferSelectModel<typeof profiles>;
 export type UserManagementRelationship = InferSelectModel<typeof userManagementRelationships>;
+
+/**
+ * `organizations` Database Table Schema Definition.
+ */
+export const organizations = pgTable('organizations', {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    description: text('description'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+/**
+ * Join table for Users and Organizations
+ */
+export const userOrganizations = pgTable('user_organizations', {
+    userId: uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+}, (t) => [
+    primaryKey({ columns: [t.userId, t.organizationId] })
+]);
+
+/**
+ * Join table for Todos and Organizations
+ */
+export const todoOrganizations = pgTable('todo_organizations', {
+    todoId: integer('todo_id').notNull().references(() => todos.id, { onDelete: 'cascade' }),
+    organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+}, (t) => [
+    primaryKey({ columns: [t.todoId, t.organizationId] })
+]);
+
+export type Organization = InferSelectModel<typeof organizations>;
+export type UserOrganization = InferSelectModel<typeof userOrganizations>;
+export type TodoOrganization = InferSelectModel<typeof todoOrganizations>;

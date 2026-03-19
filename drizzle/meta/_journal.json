@@ -22,6 +22,20 @@
       "when": 1773511366141,
       "tag": "0002_tidy_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773936075370,
+      "tag": "0003_fluffy_shooting_star",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773938926589,
+      "tag": "0004_sparkling_revanche",
+      "breakpoints": true
     }
   ]
 }
