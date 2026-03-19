@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { type Profile, type UserManagementRelationship } from '@/db/schema'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
-import { Edit2, XCircle, Save, User as UserIcon, Phone, Mail, Calendar } from 'lucide-react'
+import { Edit2, XCircle, Save, User as UserIcon, Phone, Mail, Calendar, Image as ImageIcon, FileText, Camera } from 'lucide-react'
 import { StandardDetailForm } from '@/components/templates/StandardDetailForm'
 import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 import { updateProfile, updateUserManagementRelationships, updateUserOrganizations } from './actions'
@@ -162,8 +162,17 @@ export function UserDetailsPanel({
         });
     }, [allProfiles, profile, simulatedGraph]);
 
+    const promptAddImage = () => { console.warn("Image upload not supported for users yet") }
+    const promptCaptureImage = () => { console.warn("Camera capture not supported for users yet") }
+    const promptAddFile = () => { console.warn("File upload not supported for users yet") }
+
     const formActions = readOnly ? (
-        <ToolbarButton variant="outline" onClick={onEnterEditMode} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<Edit2 />} label="Edit Profile" />
+        <>
+            <ToolbarButton variant="outline" onClick={promptAddImage} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<ImageIcon />} label="Add Image" />
+            <ToolbarButton variant="outline" onClick={promptCaptureImage} className="h-9 text-pink-600 hover:text-pink-700 hover:bg-pink-50 hover:shadow-glow-pink-sm" icon={<Camera />} label="Capture" />
+            <ToolbarButton variant="outline" onClick={promptAddFile} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<FileText />} label="Add File" />
+            <ToolbarButton variant="outline" onClick={onEnterEditMode} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<Edit2 />} label="Edit Details" />
+        </>
     ) : sublistBusy ? null : (
         <>
             <ToolbarButton variant="outline" onClick={handleDiscard} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard" />

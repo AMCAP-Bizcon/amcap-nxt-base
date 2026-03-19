@@ -7,6 +7,8 @@ import { UserDetailsPanel } from './UserDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
 import { type Profile, type UserManagementRelationship, type Organization, type UserOrganization } from '@/db/schema'
 import { cn } from '@/lib/utils'
+import { PlusCircle, Edit2, MoveVertical, CheckSquare, Trash2, XCircle, Save, ArrowLeft } from 'lucide-react'
+import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 
 interface UserListProps {
     initialProfiles: Profile[]
@@ -34,6 +36,38 @@ export function UserList({
     const [userOrgs, setUserOrgs] = useState(initialUserOrgs)
     const [detailsMode, setDetailsMode] = useState<'idle' | 'editing'>('idle')
 
+    const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete' | 'reordering'>('idle')
+    const [isSaving, setIsSaving] = useState(false)
+
+    const handleDiscardList = () => {
+        setMode('idle')
+    }
+
+    const handleSaveList = async () => {
+        setIsSaving(true)
+        try {
+            // Placeholder: no list operations implemented natively for users yet
+        } finally {
+            setIsSaving(false)
+            setMode('idle')
+        }
+    }
+
+    const listToolbarActions = mode === 'idle' ? (
+        <>
+            <ToolbarButton variant="outline" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<PlusCircle />} label="Create" />
+            <ToolbarButton variant="outline" onClick={() => setMode('editing')} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<Edit2 />} label="Edit" />
+            <ToolbarButton variant="outline" onClick={() => setMode('reordering')} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm" icon={<MoveVertical />} label="Move" />
+            <ToolbarButton variant="outline" onClick={() => setMode('done')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Complete" />
+            <ToolbarButton variant="outline" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm" icon={<Trash2 />} label="Remove" />
+        </>
+    ) : (
+        <>
+            <ToolbarButton variant="outline" onClick={handleDiscardList} disabled={isSaving} className="h-9 text-slate-500 hover:text-slate-600 hover:bg-slate-50 hover:shadow-glow-slate-sm dark:hover:bg-slate-900/50" icon={<XCircle />} label="Discard" />
+            <ToolbarButton variant="outline" onClick={handleSaveList} disabled={isSaving} className="h-9 text-sky-600 hover:text-sky-700 hover:bg-sky-50 hover:shadow-glow-sky-sm dark:hover:bg-sky-900/50" icon={<Save />} label={isSaving ? 'Saving...' : 'Save'} />
+        </>
+    )
+
     useEffect(() => {
         setProfiles(initialProfiles)
         setRelationships(initialRelationships)
@@ -57,7 +91,7 @@ export function UserList({
     }
 
     const listSlot = (
-        <StandardList title="Users">
+        <StandardList title="Users" toolbarActions={listToolbarActions}>
             <ul className="space-y-3">
                 {profiles.map((profile) => (
                     <li

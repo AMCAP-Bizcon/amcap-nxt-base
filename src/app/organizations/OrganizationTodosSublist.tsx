@@ -3,7 +3,7 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { type Todo } from '@/db/schema'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
-import { PlusCircle, Trash2, Save, XCircle, Check } from 'lucide-react'
+import { PlusCircle, Trash2, Save, XCircle, Check, Edit2, MoveVertical, CheckSquare } from 'lucide-react'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { ResponsiveToolbar } from '@/components/ui/responsive-toolbar'
@@ -88,8 +88,11 @@ export const OrganizationTodosSublist = forwardRef<OrganizationTodosSublistRef, 
                 <ResponsiveToolbar>
                     {mode === 'idle' ? (
                         <>
-                            <ToolbarButton variant="outline" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<PlusCircle />} label="Link Todo" />
-                            <ToolbarButton variant="outline" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm" icon={<Trash2 />} label="Unlink" />
+                            <ToolbarButton variant="outline" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<PlusCircle />} label="Create" />
+                            <ToolbarButton variant="outline" onClick={() => {}} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<Edit2 />} label="Edit" />
+                            <ToolbarButton variant="outline" onClick={() => {}} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm" icon={<MoveVertical />} label="Move" />
+                            <ToolbarButton variant="outline" onClick={() => {}} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Complete" />
+                            <ToolbarButton variant="outline" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm" icon={<Trash2 />} label="Remove" />
                         </>
                     ) : (
                         <>
