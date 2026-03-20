@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
-import { profiles, userManagementRelationships, type Profile } from '@/db/schema'
+import { profiles, userManagementRelationships, type Profile, userRoles } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
+import { requirePermission } from '@/utils/rbac'
 import { eq, and, or, sql, inArray } from 'drizzle-orm'
 
 /**
@@ -16,6 +17,7 @@ import { eq, and, or, sql, inArray } from 'drizzle-orm'
 export async function updateProfile(id: string, details: Partial<Pick<Profile, 'displayName' | 'phone'>>) {
     // 1. Verify who is making the request
     await requireUser()
+    await requirePermission('users', 'update')
 
     // 2. Perform update
     await db
@@ -39,6 +41,7 @@ export async function updateProfile(id: string, details: Partial<Pick<Profile, '
 export async function updateUserManagementRelationships(userId: string, managerIds: string[], managedUserIds: string[]) {
     // 1. Verify who is making the request
     await requireUser()
+    await requirePermission('users', 'update')
 
     await db.transaction(async (tx) => {
         // 1. Delete all existing relationships involving this userId
@@ -101,6 +104,7 @@ export async function updateUserManagementRelationships(userId: string, managerI
  */
 export async function updateUserOrganizations(userId: string, organizationIds: number[]) {
     await requireUser()
+    await requirePermission('users', 'update')
     const { userOrganizations } = await import('@/db/schema'); // dynamic import or add to top
 
     await db.transaction(async (tx) => {
@@ -126,6 +130,7 @@ export async function updateUserOrganizations(userId: string, organizationIds: n
  */
 export async function updateUserSequence(updates: { id: string; sequence: number }[]) {
     await requireUser()
+    await requirePermission('users', 'update')
 
     if (updates.length > 0) {
         await db.transaction(async (tx) => {
@@ -148,6 +153,7 @@ export async function updateUserSequence(updates: { id: string; sequence: number
  */
 export async function updateUserNames(updates: { id: string; displayName: string }[]) {
     await requireUser()
+    await requirePermission('users', 'update')
 
     if (updates.length > 0) {
         await db.transaction(async (tx) => {
@@ -170,6 +176,7 @@ export async function updateUserNames(updates: { id: string; displayName: string
  */
 export async function toggleUsersDoneStatus(ids: string[]) {
     await requireUser()
+    await requirePermission('users', 'update')
 
     if (ids.length > 0) {
         await db.transaction(async (tx) => {
@@ -194,3 +201,35 @@ export async function toggleUsersDoneStatus(ids: string[]) {
         revalidatePath('/users')
     }
 }
+
+/**
+ * Updates the roles assigned to a user across organizations.
+ * 
+ * @param {string} userId - The UUID of the user
+ * @param {Array<{roleId: number, organizationId: number}>} assignments - The role assignments
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateUserRoles(userId: string, assignments: { roleId: number, organizationId: number }[]) {
+    await requireUser()
+    await requirePermission('users', 'update')
+
+    await db.transaction(async (tx) => {
+        // Delete existing role assignments for this user
+        await tx.delete(userRoles).where(eq(userRoles.userId, userId));
+
+        // Insert new ones
+        if (assignments.length > 0) {
+            const values = assignments.map((assignment) => ({
+                userId,
+                roleId: assignment.roleId,
+                organizationId: assignment.organizationId
+            }));
+            await tx.insert(userRoles).values(values);
+        }
+    });
+
+    revalidatePath('/users')
+    revalidatePath('/roles')
+    revalidatePath('/organizations')
+}
+

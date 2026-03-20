@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ListTodo, Users, Building2 } from 'lucide-react';
+import { ListTodo, Users, Building2, Shield } from 'lucide-react';
 
 /**
  * Home Component
@@ -51,6 +51,17 @@ export default async function Home() {
             <Building2 className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 transition-transform group-hover:scale-110 duration-300" />
             <span className="text-xs sm:text-sm font-medium">
               Orgs
+            </span>
+          </Link>
+
+          <Link
+            href="/roles"
+            className="flex flex-col items-center justify-center gap-3 group focus:outline-none w-full aspect-square max-w-[6.5rem] sm:max-w-[7.5rem] rounded-[1.25rem] sm:rounded-[1.5rem] border border-rose-500/30 bg-background text-rose-500 shadow-sm hover:border-rose-500/60 hover:bg-rose-500/5 dark:hover:bg-rose-500/10 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(244,63,94,0.5)] transition-all duration-300 ease-out"
+            aria-label="Open Roles App"
+          >
+            <Shield className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 transition-transform group-hover:scale-110 duration-300" />
+            <span className="text-xs sm:text-sm font-medium">
+              Roles
             </span>
           </Link>
 

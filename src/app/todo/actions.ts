@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { todos, todoRelationships, todoMedia, type Todo } from '@/db/schema'
 import { requireUser, createClient } from '@/utils/supabase/server'
+import { requirePermission } from '@/utils/rbac'
 import { eq, and, or, inArray, sql } from 'drizzle-orm'
 
 /**
@@ -34,6 +35,7 @@ async function deleteAssociatedMedia(supabase: any, todoIds: number[]) {
 export async function createTodo(text: string) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'create')
 
     // Find the current minimum sequence for this user's todos
     const [result] = await db
@@ -68,6 +70,7 @@ export async function createTodo(text: string) {
 export async function deleteTodo(id: number) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'delete')
     const supabase = await createClient()
 
     // 2. Verify ownership and delete media from the storage bucket
@@ -98,6 +101,7 @@ export async function deleteTodo(id: number) {
 export async function updateTodoSequence(items: { id: number; sequence: number }[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'update')
 
     if (items.length === 0) return
 
@@ -135,6 +139,7 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
 export async function updateTodoTexts(items: { id: number; text: string }[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'update')
 
     if (items.length === 0) return
 
@@ -170,6 +175,7 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
  */
 export async function toggleTodoPin(id: number) {
     const user = await requireUser()
+    await requirePermission('todos', 'update')
 
     await db
         .update(todos)
@@ -188,6 +194,7 @@ export async function toggleTodoPin(id: number) {
 export async function toggleTodosDoneStatus(ids: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'update')
 
     if (ids.length === 0) return
 
@@ -210,6 +217,7 @@ export async function toggleTodosDoneStatus(ids: number[]) {
 export async function deleteMultipleTodos(ids: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'delete')
     const supabase = await createClient()
 
     if (ids.length === 0) return
@@ -244,6 +252,7 @@ export async function deleteMultipleTodos(ids: number[]) {
 export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'isPinned'>> & { images?: { url: string, path: string }[], files?: { url: string, path: string }[] }) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'update')
     const supabase = await createClient()
 
     // Verify ownership
@@ -326,6 +335,7 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
 export async function updateTodoRelationships(todoId: number, parentIds: number[], childIds: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
+    await requirePermission('todos', 'update')
 
     try {
         await db.transaction(async (tx) => {
@@ -440,6 +450,7 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
  */
 export async function updateTodoOrganizations(todoId: number, organizationIds: number[]) {
     await requireUser()
+    await requirePermission('todos', 'update')
     const { todoOrganizations } = await import('@/db/schema'); // dynamic import or add to top
 
     await db.transaction(async (tx) => {

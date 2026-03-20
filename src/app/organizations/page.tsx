@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { organizations, userOrganizations, todoOrganizations, profiles, todos } from '@/db/schema'
+import { organizations, userOrganizations, todoOrganizations, profiles, todos, roles, userRoles } from '@/db/schema'
 import { createClient } from '@/utils/supabase/server'
 import { OrganizationsList } from './OrganizationsList'
 import { eq } from 'drizzle-orm'
@@ -37,6 +37,8 @@ export default async function OrganizationsPage(props: {
 
     const allUserOrganizations = await db.select().from(userOrganizations);
     const allTodoOrganizations = await db.select().from(todoOrganizations);
+    const allRoles = await db.select().from(roles).orderBy(roles.name);
+    const allUserRoles = await db.select().from(userRoles);
 
     return (
         <div className="flex justify-center p-8 w-full flex-1 min-h-0 bg-transparent">
@@ -44,6 +46,8 @@ export default async function OrganizationsPage(props: {
                 initialOrganizations={allOrganizations}
                 initialUserOrgs={allUserOrganizations}
                 initialTodoOrgs={allTodoOrganizations}
+                initialRoles={allRoles}
+                initialUserRoles={allUserRoles}
                 allProfiles={allUsers}
                 allTodos={userTodos}
                 selectedId={selectedId}

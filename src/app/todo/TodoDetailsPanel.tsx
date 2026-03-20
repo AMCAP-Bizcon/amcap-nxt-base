@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, forwardRef, useImperativeHandle, useRef, useMemo, useCallback } from 'react'
+import { toast } from "sonner";
 import { type TodoRelationship } from '@/db/schema'
 import { type TodoWithMedia } from './TodoList'
 import { Button } from '@/components/ui/button'
@@ -141,15 +142,19 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
             const relUpdate = await updateTodoRelationships(todo.id, details.parentIds, details.childIds);
             if (relUpdate && !relUpdate.success) {
-                alert(relUpdate.error || "Failed to save relationships: circular dependency detected.");
+                toast.error(relUpdate.error || "Failed to save relationships: circular dependency detected.");
             }
 
             await updateTodoOrganizations(todo.id, details.organizationIds);
 
             onSaved()
-        } catch (error) {
-            console.error('Failed to save todo details', error)
-            alert(error instanceof Error ? error.message : "Failed to save details.")
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to save todo details', error);
+                toast.error(error instanceof Error ? error.message : "Failed to save details.");
+            }
         } finally {
             setIsSaving(false)
         }
@@ -255,9 +260,13 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
             setDetails(prev => ({ ...prev, images: [...prev.images, { url: data.publicUrl, path: fileName }] }));
             if (readOnly) onEnterEditMode?.()
-        } catch (error) {
-            console.error('Failed to upload image:', error);
-            alert('Failed to upload image. Please try again.');
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to upload image:', error);
+                toast.error('Failed to upload image. Please try again.');
+            }
         } finally {
             setIsUploading(false);
             if (imageInputRef.current) imageInputRef.current.value = '';
@@ -285,9 +294,13 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
 
             addFile(originalName, data.publicUrl, fileName);
             if (readOnly) onEnterEditMode?.()
-        } catch (error) {
-            console.error('Failed to upload file:', error);
-            alert('Failed to upload file. Please try again.');
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to upload file:', error);
+                toast.error('Failed to upload file. Please try again.');
+            }
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -318,9 +331,13 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     try {
                         await updateTodoDetails(todo.id, { isPinned: newPinnedState });
                         onSaved();
-                    } catch (error) {
-                        console.error('Failed to auto-save pin state', error);
-                        alert('Failed to save pin state.');
+                    } catch (error: any) {
+                        if (error?.message?.includes('Forbidden')) {
+                            toast.error("Access Denied: " + error.message);
+                        } else {
+                            console.error('Failed to auto-save pin state', error);
+                            toast.error('Failed to save pin state.');
+                        }
                         setDetails({ ...details, isPinned: !newPinnedState }); // revert optimistic update
                     }
                 }

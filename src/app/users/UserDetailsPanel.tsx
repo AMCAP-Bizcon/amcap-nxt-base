@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { toast } from "sonner";
 import { type Profile, type UserManagementRelationship } from '@/db/schema'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { Edit2, XCircle, Save, User as UserIcon, Phone, Mail, Calendar, Image as ImageIcon, FileText, Camera } from 'lucide-react'
@@ -9,6 +10,7 @@ import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 import { updateProfile, updateUserManagementRelationships, updateUserOrganizations } from './actions'
 import { UserRelationshipSubList, type UserRelationshipSubListRef } from './UserRelationshipSubList'
 import { UserOrganizationsSublist, type UserOrganizationsSublistRef } from './UserOrganizationsSublist'
+import { UserRolesSublist, type UserRolesSublistRef, type UserRoleAssignment } from './UserRolesSublist'
 
 interface UserDetailsPanelProps {
     profile: Profile | null
@@ -16,6 +18,8 @@ interface UserDetailsPanelProps {
     relationships: UserManagementRelationship[]
     allOrganizations: import('@/db/schema').Organization[]
     userOrgs: import('@/db/schema').UserOrganization[]
+    allRoles: import('@/db/schema').Role[]
+    userRoles: import('@/db/schema').UserRole[]
     readOnly?: boolean
     onEnterEditMode?: () => void
     onClose: () => void
@@ -31,6 +35,8 @@ export function UserDetailsPanel({
     relationships,
     allOrganizations,
     userOrgs,
+    allRoles,
+    userRoles,
     readOnly = false,
     onEnterEditMode,
     onClose,
@@ -46,17 +52,20 @@ export function UserDetailsPanel({
         managerIds: string[];
         managedUserIds: string[];
         organizationIds: number[];
-    }>({ displayName: '', phone: '', managerIds: [], managedUserIds: [], organizationIds: [] })
+        roleAssignments: UserRoleAssignment[];
+    }>({ displayName: '', phone: '', managerIds: [], managedUserIds: [], organizationIds: [], roleAssignments: [] })
 
     const [sublistBusy, setSublistBusy] = useState(false)
     const managersSublistMode = useRef<string>('idle')
     const managedBySublistMode = useRef<string>('idle')
     const orgsSublistMode = useRef<string>('idle')
+    const rolesSublistMode = useRef<string>('idle')
     const currentProfileId = useRef<string | null>(null)
 
     const managersListRef = useRef<UserRelationshipSubListRef>(null)
     const managedByListRef = useRef<UserRelationshipSubListRef>(null)
     const orgsListRef = useRef<UserOrganizationsSublistRef>(null)
+    const rolesListRef = useRef<UserRolesSublistRef>(null)
 
     useEffect(() => {
         if (profile && profile.id !== currentProfileId.current) {
@@ -67,23 +76,29 @@ export function UserDetailsPanel({
                 managerIds: relationships.filter(r => r.managedUserId === profile.id).map(r => r.managerId),
                 managedUserIds: relationships.filter(r => r.managerId === profile.id).map(r => r.managedUserId),
                 organizationIds: userOrgs.filter(r => r.userId === profile.id).map(r => r.organizationId),
+                roleAssignments: userRoles.filter(r => r.userId === profile.id).map(r => ({ roleId: r.roleId, organizationId: r.organizationId, userId: r.userId })),
             })
         }
-    }, [profile, relationships, userOrgs])
+    }, [profile, relationships, userOrgs, userRoles])
 
     const handleManagersModeChange = useCallback((mode: string) => {
         managersSublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || managedBySublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || managedBySublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle' || rolesSublistMode.current !== 'idle')
     }, [])
 
     const handleManagedByModeChange = useCallback((mode: string) => {
         managedBySublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle' || rolesSublistMode.current !== 'idle')
     }, [])
 
     const handleOrgsModeChange = useCallback((mode: string) => {
         orgsSublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle' || managedBySublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle' || managedBySublistMode.current !== 'idle' || rolesSublistMode.current !== 'idle')
+    }, [])
+
+    const handleRolesModeChange = useCallback((mode: string) => {
+        rolesSublistMode.current = mode
+        setSublistBusy(mode !== 'idle' || managersSublistMode.current !== 'idle' || managedBySublistMode.current !== 'idle' || orgsSublistMode.current !== 'idle')
     }, [])
 
     if (!profile) return null
@@ -97,12 +112,18 @@ export function UserDetailsPanel({
                     phone: details.phone,
                 }),
                 updateUserManagementRelationships(profile.id, details.managerIds, details.managedUserIds),
-                updateUserOrganizations(profile.id, details.organizationIds)
+                updateUserOrganizations(profile.id, details.organizationIds),
+                // Note: requires updateUserRoles action available in ./actions
+                import('./actions').then(({ updateUserRoles }) => updateUserRoles(profile.id, details.roleAssignments))
             ])
             onSaved()
-        } catch (error) {
-            console.error('Failed to save user details', error)
-            alert(error instanceof Error ? error.message : "Failed to save details.")
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to save user details', error);
+                toast.error(error instanceof Error ? error.message : "Failed to save details.");
+            }
         } finally {
             setIsSaving(false)
         }
@@ -116,6 +137,7 @@ export function UserDetailsPanel({
                 managerIds: relationships.filter(r => r.managedUserId === profile.id).map(r => r.managerId),
                 managedUserIds: relationships.filter(r => r.managerId === profile.id).map(r => r.managedUserId),
                 organizationIds: userOrgs.filter(r => r.userId === profile.id).map(r => r.organizationId),
+                roleAssignments: userRoles.filter(r => r.userId === profile.id).map(r => ({ roleId: r.roleId, organizationId: r.organizationId, userId: r.userId })),
             });
         }
         onDiscard();
@@ -123,6 +145,7 @@ export function UserDetailsPanel({
 
     const allProfilesMap = useMemo(() => new Map(allProfiles.map(p => [p.id, p])), [allProfiles]);
     const allOrganizationsMap = useMemo(() => new Map(allOrganizations.map(o => [o.id, o])), [allOrganizations]);
+    const allRolesMap = useMemo(() => new Map(allRoles.map(r => [r.id, r])), [allRoles]);
 
     const simulatedGraph = useMemo(() => {
         if (!profile) return [];
@@ -285,6 +308,21 @@ export function UserDetailsPanel({
                                     readOnly={readOnly}
                                     onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, organizationIds: newIds }))}
                                     onModeChange={handleOrgsModeChange}
+                                />
+                            )
+                        },
+                        {
+                            id: 'roles',
+                            label: 'Roles',
+                            content: (
+                                <UserRolesSublist
+                                    ref={rolesListRef}
+                                    assignments={details.roleAssignments}
+                                    allRolesMap={allRolesMap}
+                                    allOrganizationsMap={allOrganizationsMap}
+                                    readOnly={readOnly}
+                                    onAssignmentsChanged={(newAsg) => setDetails(prev => ({ ...prev, roleAssignments: newAsg }))}
+                                    onModeChange={handleRolesModeChange}
                                 />
                             )
                         }

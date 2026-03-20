@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
-import { organizations, userOrganizations, todoOrganizations, profiles, todos, type Organization } from '@/db/schema'
+import { organizations, userOrganizations, todoOrganizations, profiles, todos, type Organization, userRoles } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
+import { requirePermission } from '@/utils/rbac'
 import { eq, inArray } from 'drizzle-orm'
 
 /**
@@ -14,6 +15,7 @@ import { eq, inArray } from 'drizzle-orm'
  */
 export async function createOrganization(name: string) {
     await requireUser()
+    await requirePermission('organizations', 'create')
 
     const [newOrg] = await db.insert(organizations).values({
         name,
@@ -33,6 +35,7 @@ export async function createOrganization(name: string) {
  */
 export async function updateOrganizationDetails(id: number, details: Partial<Pick<Organization, 'name' | 'description'>>) {
     await requireUser()
+    await requirePermission('organizations', 'update')
 
     if (Object.keys(details).length > 0) {
         await db
@@ -52,6 +55,7 @@ export async function updateOrganizationDetails(id: number, details: Partial<Pic
  */
 export async function deleteOrganization(id: number) {
     await requireUser()
+    await requirePermission('organizations', 'delete')
 
     await db.delete(organizations).where(eq(organizations.id, id))
 
@@ -67,6 +71,7 @@ export async function deleteOrganization(id: number) {
  */
 export async function updateOrganizationUsers(organizationId: number, userIds: string[]) {
     await requireUser()
+    await requirePermission('organizations', 'update')
 
     await db.transaction(async (tx) => {
         // Delete existing mappings
@@ -94,6 +99,7 @@ export async function updateOrganizationUsers(organizationId: number, userIds: s
  */
 export async function updateOrganizationTodos(organizationId: number, todoIds: number[]) {
     await requireUser()
+    await requirePermission('organizations', 'update')
 
     await db.transaction(async (tx) => {
         // Delete existing mappings
@@ -120,6 +126,7 @@ export async function updateOrganizationTodos(organizationId: number, todoIds: n
  */
 export async function updateOrgSequence(updates: { id: number; sequence: number }[]) {
     await requireUser()
+    await requirePermission('organizations', 'update')
 
     if (updates.length > 0) {
         await db.transaction(async (tx) => {
@@ -142,6 +149,7 @@ export async function updateOrgSequence(updates: { id: number; sequence: number 
  */
 export async function updateOrgNames(updates: { id: number; name: string }[]) {
     await requireUser()
+    await requirePermission('organizations', 'update')
 
     if (updates.length > 0) {
         await db.transaction(async (tx) => {
@@ -164,6 +172,7 @@ export async function updateOrgNames(updates: { id: number; name: string }[]) {
  */
 export async function toggleOrgsDoneStatus(ids: number[]) {
     await requireUser()
+    await requirePermission('organizations', 'update')
 
     if (ids.length > 0) {
         await db.transaction(async (tx) => {
@@ -197,9 +206,42 @@ export async function toggleOrgsDoneStatus(ids: number[]) {
  */
 export async function deleteMultipleOrgs(ids: number[]) {
     await requireUser()
+    await requirePermission('organizations', 'delete')
 
     if (ids.length > 0) {
         await db.delete(organizations).where(inArray(organizations.id, ids));
         revalidatePath('/organizations');
     }
 }
+
+/**
+ * Updates the roles assigned to users within an organization.
+ * 
+ * @param {number} organizationId - The ID of the Organization
+ * @param {Array<{roleId: number, userId: string}>} assignments - The role assignments
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateOrganizationRoles(organizationId: number, assignments: { roleId: number, userId: string }[]) {
+    await requireUser()
+    await requirePermission('organizations', 'update')
+
+    await db.transaction(async (tx) => {
+        // Delete existing role assignments for this organization
+        await tx.delete(userRoles).where(eq(userRoles.organizationId, organizationId));
+
+        // Insert new ones
+        if (assignments.length > 0) {
+            const values = assignments.map((assignment) => ({
+                organizationId,
+                roleId: assignment.roleId,
+                userId: assignment.userId
+            }));
+            await tx.insert(userRoles).values(values);
+        }
+    });
+
+    revalidatePath('/organizations')
+    revalidatePath('/roles')
+    revalidatePath('/users')
+}
+

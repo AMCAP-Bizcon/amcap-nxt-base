@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { toast } from "sonner";
 import { Button } from '@/components/ui/button'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { CheckSquare, Trash2, Edit2, MoveVertical, Save, XCircle, PlusCircle, ArrowLeft } from 'lucide-react'
@@ -173,9 +174,13 @@ export function TodoList({
             setMode('idle')
             setEditingTodoId(null)
             setSelectedTodoIds([])
-        } catch (error) {
+        } catch (error: any) {
             pendingUpdate.current = false
-            console.error("Failed to save", error)
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error("Failed to save", error);
+            }
         } finally {
             setIsSaving(false)
         }

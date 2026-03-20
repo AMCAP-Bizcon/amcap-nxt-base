@@ -4,14 +4,14 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { toast } from "sonner";
 import { MasterDetailLayout } from '@/components/templates/MasterDetailLayout'
 import { StandardList } from '@/components/templates/StandardList'
-import { UserDetailsPanel } from './UserDetailsPanel'
+import { RoleDetailsPanel } from './RoleDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
-import { type Profile, type UserManagementRelationship, type Organization, type UserOrganization, type Role, type UserRole } from '@/db/schema'
+import { type Role, type UserRole, type Profile, type Organization, type AccessRule, type AppTable } from '@/db/schema'
 import { cn } from '@/lib/utils'
-import { Edit2, MoveVertical, CheckSquare, XCircle, Save, ArrowLeft } from 'lucide-react'
-import { ResponsiveToolbar, ToolbarButton } from '@/components/ui/responsive-toolbar'
+import { createRole, updateRoleSequence, updateRoleNames, toggleRolesDoneStatus, deleteMultipleRoles } from './actions'
+import { ToolbarButton } from '@/components/ui/responsive-toolbar'
+import { PlusCircle, Edit2, MoveVertical, CheckSquare, Trash2, XCircle, Save } from 'lucide-react'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
-import { updateUserSequence, updateUserNames, toggleUsersDoneStatus } from './actions'
 import {
     DndContext,
     closestCenter,
@@ -30,18 +30,18 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-interface UserListProps {
-    initialProfiles: Profile[]
-    initialRelationships: UserManagementRelationship[]
-    initialOrganizations: Organization[]
-    initialUserOrgs: UserOrganization[]
+interface RolesListProps {
     initialRoles: Role[]
     initialUserRoles: UserRole[]
-    selectedId: string | null
+    initialAccessRules: AccessRule[]
+    allAppTables: AppTable[]
+    allProfiles: Profile[]
+    allOrganizations: Organization[]
+    selectedId: number | null
     activeTab: string
 }
 
-function SortableUserItem({ id, profile, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: string, profile: Profile, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: string) => void, onOpenDetails: (id: string) => void, onTextChange: (id: string, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: string) => void, selectedId: string | null }) {
+function SortableRoleItem({ id, role, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: number, role: Role, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void, selectedId: number | null }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
 
     const style = { transform: CSS.Transform.toString(transform), transition }
@@ -53,65 +53,61 @@ function SortableUserItem({ id, profile, isReordering, isEditing, isIdle, isCurr
             )}
             <div className={`flex flex-col gap-1 w-full ${isEditing || isIdle ? 'cursor-pointer' : ''}`} onClick={() => { if (isEditing) onStartEdit(id); else if (isIdle) onOpenDetails(id); }}>
                 {isCurrentlyEditing ? (
-                    <AutoResizeTextarea value={profile.displayName || ''} onChange={(e) => onTextChange(id, e.target.value)} className="bg-transparent border-b border-primary outline-none font-semibold text-lg px-1 -mx-1 py-0 resize-none overflow-hidden h-7" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }} />
+                    <AutoResizeTextarea value={role.name} onChange={(e) => onTextChange(id, e.target.value)} className="bg-transparent border-b border-primary outline-none font-semibold text-lg px-1 -mx-1 py-0 resize-none overflow-hidden h-7" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }} />
                 ) : (
-                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${profile.done ? 'line-through text-muted-foreground' : ''}`}>{profile.displayName || "Unknown User"}</span>
+                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${role.done ? 'line-through text-muted-foreground' : ''}`}>{role.name}</span>
                 )}
-                {!isCurrentlyEditing && (
-                    <span className={`text-sm text-muted-foreground italic truncate ${profile.done ? 'line-through' : ''}`}>
-                        {profile.email}
+                {role.description && !isCurrentlyEditing && (
+                    <span className={`text-sm text-muted-foreground truncate ${role.done ? 'line-through' : ''}`}>
+                        {role.description}
                     </span>
                 )}
                 <span className="text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
-                    Joined {new Date(profile.createdAt).toLocaleDateString('en-GB')}
+                    Created {new Date(role.createdAt).toLocaleDateString('en-GB')}
                 </span>
             </div>
         </li>
     )
 }
 
-export function UserList({
-    initialProfiles,
-    initialRelationships,
-    initialOrganizations,
-    initialUserOrgs,
+export function RolesList({
     initialRoles,
     initialUserRoles,
+    initialAccessRules,
+    allAppTables,
+    allProfiles,
+    allOrganizations,
     selectedId,
     activeTab
-}: UserListProps) {
+}: RolesListProps) {
     const router = useRouter()
     const pathname = usePathname()
 
-    const [profiles, setProfiles] = useState(initialProfiles)
-    const [relationships, setRelationships] = useState(initialRelationships)
-    const [organizations, setOrganizations] = useState(initialOrganizations)
-    const [userOrgs, setUserOrgs] = useState(initialUserOrgs)
     const [roles, setRoles] = useState(initialRoles)
     const [userRoles, setUserRoles] = useState(initialUserRoles)
+    const [accessRules, setAccessRules] = useState(initialAccessRules)
+    
+    const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete' | 'reordering'>('idle')
+    const [isSaving, setIsSaving] = useState(false)
+    const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
+    const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([])
+    const [newRoleName, setNewRoleName] = useState('')
     const [detailsMode, setDetailsMode] = useState<'idle' | 'editing'>('idle')
 
-    const [mode, setMode] = useState<'idle' | 'editing' | 'done' | 'reordering'>('idle')
-    const [isSaving, setIsSaving] = useState(false)
-    const [editingUserId, setEditingUserId] = useState<string | null>(null)
-    const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
-
-    const sortedProfiles = useMemo(() => [...profiles].sort((a,b) => a.sequence - b.sequence), [profiles])
+    const sortedRoles = useMemo(() => [...roles].sort((a,b) => a.sequence - b.sequence), [roles])
     const pendingUpdate = useRef(false)
 
     useEffect(() => {
         if (!pendingUpdate.current) {
-            setProfiles(initialProfiles)
-            setRelationships(initialRelationships)
-            setOrganizations(initialOrganizations)
-            setUserOrgs(initialUserOrgs)
             setRoles(initialRoles)
             setUserRoles(initialUserRoles)
+            setAccessRules(initialAccessRules)
         }
         if (mode === 'idle') {
             pendingUpdate.current = false
+            setNewRoleName('')
         }
-    }, [initialProfiles, initialRelationships, initialOrganizations, initialUserOrgs, initialRoles, initialUserRoles, mode])
+    }, [initialRoles, initialUserRoles, initialAccessRules, mode])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -121,7 +117,7 @@ export function UserList({
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event
         if (over && active.id !== over.id) {
-            setProfiles((items) => {
+            setRoles((items) => {
                 const currentSorted = [...items].sort((a,b) => a.sequence - b.sequence)
                 const oldIndex = currentSorted.findIndex(item => item.id === active.id)
                 const newIndex = currentSorted.findIndex(item => item.id === over.id)
@@ -131,7 +127,7 @@ export function UserList({
         }
     }
 
-    const handleOpenDetails = (id: string) => {
+    const handleOpenDetails = (id: number) => {
         router.push(`${pathname}?id=${id}`)
     }
 
@@ -146,27 +142,56 @@ export function UserList({
         }
     }
 
+    const handleCreateRole = async (name: string) => {
+        setIsSaving(true)
+        try {
+            const newRole = await createRole(name)
+            router.push(`${pathname}?id=${newRole.id}`)
+            setDetailsMode('editing')
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to create role', error);
+            }
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     const handleSaveList = async () => {
         setIsSaving(true)
         pendingUpdate.current = true
         try {
-            if (mode === 'reordering') {
-                const updates = profiles.map((p, index) => ({ id: p.id, sequence: index }))
-                await updateUserSequence(updates)
+            if (mode === 'creating') {
+                if (newRoleName.trim()) {
+                    await handleCreateRole(newRoleName.trim())
+                }
+            } else if (mode === 'reordering') {
+                const updates = roles.map((r, index) => ({ id: r.id, sequence: index }))
+                await updateRoleSequence(updates)
             } else if (mode === 'editing') {
-                const updates = profiles
-                    .filter(p => { const init = initialProfiles.find(ip => ip.id === p.id); return init && init.displayName !== p.displayName })
-                    .map(p => ({ id: p.id, displayName: p.displayName || '' }))
-                if (updates.length > 0) await updateUserNames(updates)
+                const updates = roles
+                    .filter(r => { const init = initialRoles.find(ir => ir.id === r.id); return init && init.name !== r.name })
+                    .map(r => ({ id: r.id, name: r.name }))
+                if (updates.length > 0) await updateRoleNames(updates)
             } else if (mode === 'done') {
-                if (selectedUserIds.length > 0) {
-                    setProfiles(profiles.map(p => selectedUserIds.includes(p.id) ? { ...p, done: !p.done } : p))
-                    await toggleUsersDoneStatus(selectedUserIds)
+                if (selectedRoleIds.length > 0) {
+                    setRoles(roles.map(r => selectedRoleIds.includes(r.id) ? { ...r, done: !r.done } : r))
+                    await toggleRolesDoneStatus(selectedRoleIds)
+                }
+            } else if (mode === 'delete') {
+                if (selectedRoleIds.length > 0) {
+                    setRoles(roles.filter(r => !selectedRoleIds.includes(r.id)))
+                    await deleteMultipleRoles(selectedRoleIds)
+                    if (selectedId && selectedRoleIds.includes(selectedId)) {
+                        handleCloseDetails()
+                    }
                 }
             }
             setMode('idle')
-            setEditingUserId(null)
-            setSelectedUserIds([])
+            setEditingRoleId(null)
+            setSelectedRoleIds([])
         } catch (error: any) {
             pendingUpdate.current = false
             if (error?.message?.includes('Forbidden')) {
@@ -180,32 +205,37 @@ export function UserList({
     }
 
     const handleDiscardList = () => {
-        setProfiles(initialProfiles)
+        setRoles(initialRoles)
         setMode('idle')
-        setEditingUserId(null)
-        setSelectedUserIds([])
+        setEditingRoleId(null)
+        setSelectedRoleIds([])
+        setNewRoleName('')
     }
 
-    const handleSelectToggle = (id: string) => {
-        setSelectedUserIds(prev => prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id])
+    const handleSelectToggle = (id: number) => {
+        setSelectedRoleIds(prev => prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id])
     }
 
-    const handleTextChange = (id: string, text: string) => {
-        setProfiles(profiles.map(p => p.id === id ? { ...p, displayName: text } : p))
+    const handleTextChange = (id: number, text: string) => {
+        setRoles(roles.map(r => r.id === id ? { ...r, name: text } : r))
     }
 
     const modeStyles: Record<typeof mode, { gradient: string, shadow: string }> = {
         idle: { gradient: 'via-slate-400/40', shadow: 'shadow-glow-slate' },
+        creating: { gradient: 'via-violet-500/50', shadow: 'shadow-glow-violet' },
         editing: { gradient: 'via-blue-500/50', shadow: 'shadow-glow-blue' },
         reordering: { gradient: 'via-amber-500/50', shadow: 'shadow-glow-amber' },
-        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' }
+        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' },
+        delete: { gradient: 'via-rose-500/50', shadow: 'shadow-glow-rose' }
     }
 
-    const listToolbarActions = mode === 'idle' ? (
+    const toolbarActions = mode === 'idle' ? (
         <>
+            <ToolbarButton variant="outline" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<PlusCircle />} label="Create" />
             <ToolbarButton variant="outline" onClick={() => setMode('editing')} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<Edit2 />} label="Edit" />
             <ToolbarButton variant="outline" onClick={() => setMode('reordering')} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm" icon={<MoveVertical />} label="Move" />
             <ToolbarButton variant="outline" onClick={() => setMode('done')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Complete" />
+            <ToolbarButton variant="outline" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm" icon={<Trash2 />} label="Remove" />
         </>
     ) : (
         <>
@@ -215,31 +245,36 @@ export function UserList({
     )
 
     const listSlot = (
-        <StandardList title="Users" toolbarActions={listToolbarActions} disabledToolbar={!!selectedId}>
+        <StandardList title="Roles" toolbarActions={toolbarActions} disabledToolbar={!!selectedId}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={sortedProfiles.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={sortedRoles.map(r => r.id)} strategy={verticalListSortingStrategy}>
                     <ul className={cn("space-y-3", detailsMode === 'editing' ? 'pointer-events-none opacity-50 transition-opacity' : '')}>
-                        {sortedProfiles.map((profile) => (
-                            <SortableUserItem
-                                key={profile.id}
-                                id={profile.id}
-                                profile={profile}
+                        {mode === 'creating' && (
+                            <li className="p-4 border border-primary/50 shadow-md rounded-md bg-card text-card-foreground flex gap-3 items-center transition-colors">
+                                <AutoResizeTextarea value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} placeholder="New Role Name" className="bg-transparent border-b border-primary outline-none font-semibold text-lg px-1 -mx-1 py-0 resize-none overflow-hidden w-full h-8" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }} />
+                            </li>
+                        )}
+                        {sortedRoles.map((role) => (
+                            <SortableRoleItem
+                                key={role.id}
+                                id={role.id}
+                                role={role}
                                 isReordering={mode === 'reordering'}
                                 isEditing={mode === 'editing'}
                                 isIdle={mode === 'idle'}
-                                isCurrentlyEditing={editingUserId === profile.id}
-                                onStartEdit={setEditingUserId}
+                                isCurrentlyEditing={editingRoleId === role.id}
+                                onStartEdit={setEditingRoleId}
                                 onOpenDetails={handleOpenDetails}
                                 onTextChange={handleTextChange}
-                                isSelectable={mode === 'done'}
-                                isSelected={selectedUserIds.includes(profile.id)}
+                                isSelectable={mode === 'done' || mode === 'delete'}
+                                isSelected={selectedRoleIds.includes(role.id)}
                                 onSelectToggle={handleSelectToggle}
                                 selectedId={selectedId}
                             />
                         ))}
-                        {sortedProfiles.length === 0 && (
+                        {sortedRoles.length === 0 && mode !== 'creating' && (
                             <p className="text-muted-foreground text-center mt-8 py-8 border-2 border-dashed border-border rounded-lg">
-                                No users found in the system.
+                                No roles found.
                             </p>
                         )}
                     </ul>
@@ -249,14 +284,13 @@ export function UserList({
     )
 
     const detailSlot = selectedId ? (
-        <UserDetailsPanel
-            profile={profiles.find(p => p.id === selectedId) || null}
-            allProfiles={profiles}
-            relationships={relationships}
-            allOrganizations={organizations}
-            userOrgs={userOrgs}
-            allRoles={roles}
+        <RoleDetailsPanel
+            role={roles.find(r => r.id === selectedId) || null}
             userRoles={userRoles}
+            accessRules={accessRules}
+            allAppTables={allAppTables}
+            allProfiles={allProfiles}
+            allOrganizations={allOrganizations}
             readOnly={detailsMode === 'idle'}
             onEnterEditMode={() => setDetailsMode('editing')}
             onClose={handleCloseDetails}

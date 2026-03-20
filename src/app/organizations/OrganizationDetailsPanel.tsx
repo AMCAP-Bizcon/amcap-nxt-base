@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { toast } from "sonner";
 import { type Organization, type UserOrganization, type TodoOrganization, type Profile, type Todo } from '@/db/schema'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { Edit2, XCircle, Save, Calendar, Trash2, Image as ImageIcon, FileText, Camera } from 'lucide-react'
@@ -9,6 +10,7 @@ import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 import { updateOrganizationDetails, deleteOrganization, updateOrganizationUsers, updateOrganizationTodos } from './actions'
 import { OrganizationUsersSublist, type OrganizationUsersSublistRef } from './OrganizationUsersSublist'
 import { OrganizationTodosSublist, type OrganizationTodosSublistRef } from './OrganizationTodosSublist'
+import { OrganizationRolesSublist, type OrganizationRolesSublistRef, type OrgRoleAssignment } from './OrganizationRolesSublist'
 import { useRouter } from 'next/navigation'
 
 interface OrganizationDetailsPanelProps {
@@ -17,6 +19,8 @@ interface OrganizationDetailsPanelProps {
     todoOrgs: TodoOrganization[]
     allProfiles: Profile[]
     allTodos: Todo[]
+    allRoles: import('@/db/schema').Role[]
+    userRoles: import('@/db/schema').UserRole[]
     readOnly?: boolean
     onEnterEditMode?: () => void
     onClose: () => void
@@ -32,6 +36,8 @@ export function OrganizationDetailsPanel({
     todoOrgs,
     allProfiles,
     allTodos,
+    allRoles,
+    userRoles,
     readOnly = false,
     onEnterEditMode,
     onClose,
@@ -48,15 +54,18 @@ export function OrganizationDetailsPanel({
         description: string;
         userIds: string[];
         todoIds: number[];
-    }>({ name: '', description: '', userIds: [], todoIds: [] })
+        roleAssignments: OrgRoleAssignment[];
+    }>({ name: '', description: '', userIds: [], todoIds: [], roleAssignments: [] })
 
     const [sublistBusy, setSublistBusy] = useState(false)
     const usersSublistMode = useRef<string>('idle')
     const todosSublistMode = useRef<string>('idle')
+    const rolesSublistMode = useRef<string>('idle')
     const currentOrgId = useRef<number | null>(null)
 
     const usersListRef = useRef<OrganizationUsersSublistRef>(null)
     const todosListRef = useRef<OrganizationTodosSublistRef>(null)
+    const rolesListRef = useRef<OrganizationRolesSublistRef>(null)
 
     useEffect(() => {
         if (organization && organization.id !== currentOrgId.current) {
@@ -66,22 +75,29 @@ export function OrganizationDetailsPanel({
                 description: organization.description || '',
                 userIds: userOrgs.filter(r => r.organizationId === organization.id).map(r => r.userId),
                 todoIds: todoOrgs.filter(r => r.organizationId === organization.id).map(r => r.todoId),
+                roleAssignments: userRoles.filter(r => r.organizationId === organization.id).map(r => ({ roleId: r.roleId, organizationId: r.organizationId, userId: r.userId })),
             })
         }
-    }, [organization, userOrgs, todoOrgs])
+    }, [organization, userOrgs, todoOrgs, userRoles])
 
     const handleUsersModeChange = useCallback((mode: string) => {
         usersSublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || todosSublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || todosSublistMode.current !== 'idle' || rolesSublistMode.current !== 'idle')
     }, [])
 
     const handleTodosModeChange = useCallback((mode: string) => {
         todosSublistMode.current = mode
-        setSublistBusy(mode !== 'idle' || usersSublistMode.current !== 'idle')
+        setSublistBusy(mode !== 'idle' || usersSublistMode.current !== 'idle' || rolesSublistMode.current !== 'idle')
+    }, [])
+
+    const handleRolesModeChange = useCallback((mode: string) => {
+        rolesSublistMode.current = mode
+        setSublistBusy(mode !== 'idle' || usersSublistMode.current !== 'idle' || todosSublistMode.current !== 'idle')
     }, [])
 
     const allProfilesMap = useMemo(() => new Map(allProfiles.map(p => [p.id, p])), [allProfiles]);
     const allTodosMap = useMemo(() => new Map(allTodos.map(t => [t.id, t])), [allTodos]);
+    const allRolesMap = useMemo(() => new Map(allRoles.map(r => [r.id, r])), [allRoles]);
 
     if (!organization) return null
 
@@ -94,12 +110,17 @@ export function OrganizationDetailsPanel({
                     description: details.description,
                 }),
                 updateOrganizationUsers(organization.id, details.userIds),
-                updateOrganizationTodos(organization.id, details.todoIds)
+                updateOrganizationTodos(organization.id, details.todoIds),
+                import('./actions').then(({ updateOrganizationRoles }) => updateOrganizationRoles(organization.id, details.roleAssignments))
             ])
             onSaved()
-        } catch (error) {
-            console.error('Failed to save org details', error)
-            alert(error instanceof Error ? error.message : "Failed to save details.")
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to save org details', error);
+                toast.error(error instanceof Error ? error.message : "Failed to save details.");
+            }
         } finally {
             setIsSaving(false)
         }
@@ -111,10 +132,14 @@ export function OrganizationDetailsPanel({
         try {
             await deleteOrganization(organization.id)
             onClose()
-        } catch (error) {
-            console.error('Failed to delete org', error)
-            alert(error instanceof Error ? error.message : "Failed to delete.")
-            setIsDeleting(false)
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to delete org', error);
+                toast.error(error instanceof Error ? error.message : "Failed to delete.");
+            }
+            setIsDeleting(false);
         }
     }
 
@@ -125,6 +150,7 @@ export function OrganizationDetailsPanel({
                 description: organization.description || '',
                 userIds: userOrgs.filter(r => r.organizationId === organization.id).map(r => r.userId),
                 todoIds: todoOrgs.filter(r => r.organizationId === organization.id).map(r => r.todoId),
+                roleAssignments: userRoles.filter(r => r.organizationId === organization.id).map(r => ({ roleId: r.roleId, organizationId: r.organizationId, userId: r.userId })),
             });
         }
         onDiscard();
@@ -228,6 +254,21 @@ export function OrganizationDetailsPanel({
                                     readOnly={readOnly}
                                     onLinksChanged={(newIds) => setDetails(prev => ({ ...prev, todoIds: newIds }))}
                                     onModeChange={handleTodosModeChange}
+                                />
+                            )
+                        },
+                        {
+                            id: 'roles',
+                            label: 'Roles',
+                            content: (
+                                <OrganizationRolesSublist
+                                    ref={rolesListRef}
+                                    assignments={details.roleAssignments}
+                                    allRolesMap={allRolesMap}
+                                    allProfilesMap={allProfilesMap}
+                                    readOnly={readOnly}
+                                    onAssignmentsChanged={(newAsg) => setDetails(prev => ({ ...prev, roleAssignments: newAsg }))}
+                                    onModeChange={handleRolesModeChange}
                                 />
                             )
                         }

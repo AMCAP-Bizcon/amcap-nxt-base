@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { toast } from "sonner";
 import { MasterDetailLayout } from '@/components/templates/MasterDetailLayout'
 import { StandardList } from '@/components/templates/StandardList'
 import { OrganizationDetailsPanel } from './OrganizationDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
-import { type Organization, type UserOrganization, type TodoOrganization, type Profile, type Todo } from '@/db/schema'
+import { type Organization, type UserOrganization, type TodoOrganization, type Profile, type Todo, type Role, type UserRole } from '@/db/schema'
 import { cn } from '@/lib/utils'
 import { createOrganization, updateOrgSequence, updateOrgNames, toggleOrgsDoneStatus, deleteMultipleOrgs } from './actions'
 import { ResponsiveToolbar, ToolbarButton } from '@/components/ui/responsive-toolbar'
@@ -35,6 +36,8 @@ interface OrganizationsListProps {
     initialTodoOrgs: TodoOrganization[]
     allProfiles: Profile[]
     allTodos: Todo[]
+    initialRoles: Role[]
+    initialUserRoles: UserRole[]
     selectedId: number | null
     activeTab: string
 }
@@ -74,6 +77,8 @@ export function OrganizationsList({
     initialTodoOrgs,
     allProfiles,
     allTodos,
+    initialRoles,
+    initialUserRoles,
     selectedId,
     activeTab
 }: OrganizationsListProps) {
@@ -83,6 +88,8 @@ export function OrganizationsList({
     const [orgs, setOrgs] = useState(initialOrganizations)
     const [userOrgs, setUserOrgs] = useState(initialUserOrgs)
     const [todoOrgs, setTodoOrgs] = useState(initialTodoOrgs)
+    const [roles, setRoles] = useState(initialRoles)
+    const [userRoles, setUserRoles] = useState(initialUserRoles)
     
     const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete' | 'reordering'>('idle')
     const [isSaving, setIsSaving] = useState(false)
@@ -99,12 +106,14 @@ export function OrganizationsList({
             setOrgs(initialOrganizations)
             setUserOrgs(initialUserOrgs)
             setTodoOrgs(initialTodoOrgs)
+            setRoles(initialRoles)
+            setUserRoles(initialUserRoles)
         }
         if (mode === 'idle') {
             pendingUpdate.current = false
             setNewOrgName('')
         }
-    }, [initialOrganizations, initialUserOrgs, initialTodoOrgs, mode])
+    }, [initialOrganizations, initialUserOrgs, initialTodoOrgs, initialRoles, initialUserRoles, mode])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -145,8 +154,12 @@ export function OrganizationsList({
             const newOrg = await createOrganization(name)
             router.push(`${pathname}?id=${newOrg.id}`)
             setDetailsMode('editing')
-        } catch (error) {
-            console.error('Failed to create organization', error)
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error('Failed to create organization', error);
+            }
         } finally {
             setIsSaving(false)
         }
@@ -185,9 +198,13 @@ export function OrganizationsList({
             setMode('idle')
             setEditingOrgId(null)
             setSelectedOrgIds([])
-        } catch (error) {
+        } catch (error: any) {
             pendingUpdate.current = false
-            console.error("Failed to save", error)
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error("Failed to save", error);
+            }
         } finally {
             setIsSaving(false)
         }
@@ -279,6 +296,8 @@ export function OrganizationsList({
             todoOrgs={todoOrgs}
             allProfiles={allProfiles}
             allTodos={allTodos}
+            allRoles={roles}
+            userRoles={userRoles}
             readOnly={detailsMode === 'idle'}
             onEnterEditMode={() => setDetailsMode('editing')}
             onClose={handleCloseDetails}

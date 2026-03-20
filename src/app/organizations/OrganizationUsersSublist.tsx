@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { toast } from "sonner";
 import { type Profile } from '@/db/schema'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { PlusCircle, Trash2, Save, XCircle, Check, Edit2, MoveVertical, CheckSquare } from 'lucide-react'
@@ -50,8 +51,12 @@ export const OrganizationUsersSublist = forwardRef<OrganizationUsersSublistRef, 
             setMode('idle')
             setSelectedIds([])
             setSearchText('')
-        } catch (error) {
-            console.error(error)
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error(error);
+            }
         } finally {
             setIsSaving(false)
         }

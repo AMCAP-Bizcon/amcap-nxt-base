@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { toast } from "sonner";
 import { type Todo } from '@/db/schema'
 import { Button } from '@/components/ui/button'
 import { ResponsiveToolbar, ToolbarButton } from '@/components/ui/responsive-toolbar'
@@ -170,8 +171,12 @@ export const RelationshipSubList = forwardRef<RelationshipSubListRef, Relationsh
             setEditingTodoId(null)
             setSelectedIds([])
             setNewTodoText('')
-        } catch (error) {
-            console.error(error)
+        } catch (error: any) {
+            if (error?.message?.includes('Forbidden')) {
+                toast.error("Access Denied: " + error.message);
+            } else {
+                console.error(error);
+            }
         } finally {
             setIsSaving(false)
         }

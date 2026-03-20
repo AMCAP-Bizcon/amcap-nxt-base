@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, timestamp, uuid, integer, jsonb, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, boolean, timestamp, uuid, integer, jsonb, primaryKey, varchar } from 'drizzle-orm/pg-core';
 import { type InferSelectModel } from 'drizzle-orm';
 
 
@@ -126,3 +126,48 @@ export const todoOrganizations = pgTable('todo_organizations', {
 export type Organization = InferSelectModel<typeof organizations>;
 export type UserOrganization = InferSelectModel<typeof userOrganizations>;
 export type TodoOrganization = InferSelectModel<typeof todoOrganizations>;
+
+/**
+ * `roles` Database Table Schema Definition.
+ */
+export const roles = pgTable('roles', {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    description: text('description'),
+    done: boolean('done').default(false).notNull(),
+    isPinned: boolean('is_pinned').default(false).notNull(),
+    sequence: integer('sequence').default(0).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+/**
+ * Join table for Users, Roles, and Organizations
+ */
+export const userRoles = pgTable('user_roles', {
+    userId: uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    roleId: integer('role_id').notNull().references(() => roles.id, { onDelete: 'cascade' }),
+    organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+}, (t) => [
+    primaryKey({ columns: [t.userId, t.roleId, t.organizationId] })
+]);
+
+export const appTables = pgTable('app_tables', {
+    id: serial('id').primaryKey(),
+    tableName: varchar('table_name', { length: 50 }).notNull().unique(), // e.g. 'todos', 'profiles', 'organizations', 'roles'
+});
+
+export const accessRules = pgTable('access_rules', {
+    id: serial('id').primaryKey(),
+    roleId: integer('role_id').notNull().references(() => roles.id, { onDelete: 'cascade' }),
+    tableId: integer('table_id').notNull().references(() => appTables.id, { onDelete: 'cascade' }),
+    canRead: boolean('can_read').default(false).notNull(),
+    canCreate: boolean('can_create').default(false).notNull(),
+    canUpdate: boolean('can_update').default(false).notNull(),
+    canDelete: boolean('can_delete').default(false).notNull(),
+    isActive: boolean('is_active').default(false).notNull(),
+});
+
+export type Role = InferSelectModel<typeof roles>;
+export type UserRole = InferSelectModel<typeof userRoles>;
+export type AccessRule = InferSelectModel<typeof accessRules>;
+export type AppTable = InferSelectModel<typeof appTables>;
