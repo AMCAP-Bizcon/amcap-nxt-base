@@ -275,7 +275,7 @@ export function UserDetailsPanel({
                         },
                         {
                             id: 'organizations',
-                            label: 'Organizations',
+                            label: 'Orgs',
                             content: (
                                 <UserOrganizationsSublist
                                     ref={orgsListRef}

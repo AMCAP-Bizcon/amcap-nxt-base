@@ -93,13 +93,13 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
         if (todo) {
             const isSameTodo = currentTodoId.current === todo.id;
             currentTodoId.current = todo.id;
-            
+
             setDetails(prev => {
                 const newParentIds = relationships
                     .filter(r => r.childId === todo.id)
                     .sort((a, b) => (allTodosMap.get(a.parentId)?.sequence ?? 0) - (allTodosMap.get(b.parentId)?.sequence ?? 0))
                     .map(r => r.parentId);
-                
+
                 const newChildIds = relationships
                     .filter(r => r.parentId === todo.id)
                     .sort((a, b) => (allTodosMap.get(a.childId)?.sequence ?? 0) - (allTodosMap.get(b.childId)?.sequence ?? 0))
@@ -252,7 +252,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
             if (uploadError) throw uploadError;
 
             const { data } = supabase.storage.from('todo-media').getPublicUrl(fileName);
-            
+
             setDetails(prev => ({ ...prev, images: [...prev.images, { url: data.publicUrl, path: fileName }] }));
             if (readOnly) onEnterEditMode?.()
         } catch (error) {
@@ -402,7 +402,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                     },
                     {
                         id: 'organizations',
-                        label: 'Organizations',
+                        label: 'Orgs',
                         content: (
                             <TodoOrganizationsSublist
                                 ref={orgsListRef}
@@ -429,15 +429,15 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 {details.images.length > 0 ? (
                     <div className="grid grid-cols-2 gap-3 mb-4">
                         {details.images.map((img, i) => (
-                            <div 
-                                key={i} 
+                            <div
+                                key={i}
                                 className="relative group rounded-md border border-border/50 overflow-hidden bg-muted aspect-video flex-shrink-0 shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
                                 onClick={() => setViewerState({ open: true, index: i })}
                             >
                                 <img src={img.url} alt={`Attached ${i}`} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400?text=Invalid+Image' }} />
                                 {!readOnly && (
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); removeImage(i); }} 
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); removeImage(i); }}
                                         className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
                                     >
                                         <X className="h-3 w-3" />
@@ -489,7 +489,7 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 </div>
             )}
 
-            <ImageViewer 
+            <ImageViewer
                 images={details.images}
                 initialIndex={viewerState.index}
                 open={viewerState.open}

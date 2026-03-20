@@ -109,7 +109,7 @@ export function OrganizationsList({
     )
 
     const listSlot = (
-        <StandardList title="Organizations" toolbarActions={toolbarActions}>
+        <StandardList title="Orgs" toolbarActions={toolbarActions}>
             <ul className="space-y-3">
                 {orgs.map((org) => (
                     <li
@@ -124,9 +124,9 @@ export function OrganizationsList({
                             {org.name}
                         </span>
                         {org.description && (
-                           <span className="text-sm text-muted-foreground truncate">
-                               {org.description}
-                           </span>
+                            <span className="text-sm text-muted-foreground truncate">
+                                {org.description}
+                            </span>
                         )}
                         <span className="text-xs text-muted-foreground mt-1" suppressHydrationWarning>
                             Created {new Date(org.createdAt).toLocaleDateString('en-GB')}

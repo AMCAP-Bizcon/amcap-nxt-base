@@ -6,7 +6,7 @@ import { ListTodo, Users, Building2 } from 'lucide-react';
  * 
  * This component renders the main landing page of the application as an App Icons Grid.
  * It serves as a central launchpad for various modules within the SaaS Boilerplate.
- * Currently, it features the "To Do" application icon which navigates users to their ToDo app.
+ * Currently, it features the "ToDo" application icon which navigates users to their ToDo app.
  * 
  * Features:
  * - Responsive grid layout that adapts to different screen sizes.
@@ -24,11 +24,11 @@ export default async function Home() {
           <Link
             href="/todo"
             className="flex flex-col items-center justify-center gap-3 group focus:outline-none w-full aspect-square max-w-[6.5rem] sm:max-w-[7.5rem] rounded-[1.25rem] sm:rounded-[1.5rem] border border-blue-500/30 bg-background text-blue-500 shadow-sm hover:border-blue-500/60 hover:bg-blue-500/5 dark:hover:bg-blue-500/10 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] transition-all duration-300 ease-out"
-            aria-label="Open To Do App"
+            aria-label="Open ToDo App"
           >
             <ListTodo className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 transition-transform group-hover:scale-110 duration-300" />
             <span className="text-xs sm:text-sm font-medium">
-              To Do
+              ToDo
             </span>
           </Link>
 
@@ -46,11 +46,11 @@ export default async function Home() {
           <Link
             href="/organizations"
             className="flex flex-col items-center justify-center gap-3 group focus:outline-none w-full aspect-square max-w-[6.5rem] sm:max-w-[7.5rem] rounded-[1.25rem] sm:rounded-[1.5rem] border border-violet-500/30 bg-background text-violet-500 shadow-sm hover:border-violet-500/60 hover:bg-violet-500/5 dark:hover:bg-violet-500/10 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] transition-all duration-300 ease-out"
-            aria-label="Open Organizations App"
+            aria-label="Open Orgs App"
           >
             <Building2 className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 transition-transform group-hover:scale-110 duration-300" />
             <span className="text-xs sm:text-sm font-medium">
-              Organizations
+              Orgs
             </span>
           </Link>
 

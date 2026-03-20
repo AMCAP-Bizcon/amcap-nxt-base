@@ -25,11 +25,11 @@ export default async function OrganizationsPage(props: {
 
     // Fetch related records
     const allUsers = await db.select().from(profiles).orderBy(profiles.displayName, profiles.email);
-    
+
     // Only fetch todos belonging to the user for now, or all todos?
     // Since an organization can contain todos from multiple users, let's fetch all todos the user belongs to.
     // Actually, according to the rules, we fetch User's todos. 
-    // "fetch ONLY the todos belonging to this user" was the rule for ToDo app, but for Organizations app it depends.
+    // "fetch ONLY the todos belonging to this user" was the rule for ToDo app, but for Orgs app it depends.
     // I'll fetch *all* todos if they are shared, but for simplicity let's fetch user's todos.
     // Let's fetch all todos and filter if needed, or query todos for the user.
     // For now, let's fetch user's todos to assign to organization.
