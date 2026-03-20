@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { profiles, userManagementRelationships, type Profile } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
-import { eq, and, or, sql } from 'drizzle-orm'
+import { eq, and, or, sql, inArray } from 'drizzle-orm'
 
 /**
  * Updates the profile details for a specific user.
@@ -116,4 +116,81 @@ export async function updateUserOrganizations(userId: string, organizationIds: n
     });
 
     revalidatePath('/users');
+}
+
+/**
+ * Updates the sequence of multiple users for drag-and-drop reordering.
+ *
+ * @param {Array<{ id: string; sequence: number }>} updates - An array containing the IDs and new sequences
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateUserSequence(updates: { id: string; sequence: number }[]) {
+    await requireUser()
+
+    if (updates.length > 0) {
+        await db.transaction(async (tx) => {
+            const promises = updates.map((update) =>
+                tx.update(profiles)
+                    .set({ sequence: update.sequence })
+                    .where(eq(profiles.id, update.id))
+            );
+            await Promise.all(promises);
+        });
+        revalidatePath('/users')
+    }
+}
+
+/**
+ * Updates the display names of multiple users (batch edit).
+ *
+ * @param {Array<{ id: string; displayName: string }>} updates - An array containing the IDs and updated display names
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateUserNames(updates: { id: string; displayName: string }[]) {
+    await requireUser()
+
+    if (updates.length > 0) {
+        await db.transaction(async (tx) => {
+            const promises = updates.map((update) =>
+                tx.update(profiles)
+                    .set({ displayName: update.displayName })
+                    .where(eq(profiles.id, update.id))
+            );
+            await Promise.all(promises);
+        });
+        revalidatePath('/users')
+    }
+}
+
+/**
+ * Toggles the "done" status for multiple users.
+ *
+ * @param {string[]} ids - An array of User IDs to toggle
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function toggleUsersDoneStatus(ids: string[]) {
+    await requireUser()
+
+    if (ids.length > 0) {
+        await db.transaction(async (tx) => {
+            // First get the current statuses
+            const currentUsers = await tx.query.profiles.findMany({
+                where: inArray(profiles.id, ids),
+                columns: {
+                    id: true,
+                    done: true
+                }
+            })
+
+            const promises = currentUsers.map(user =>
+                tx.update(profiles)
+                    .set({ done: !user.done })
+                    .where(eq(profiles.id, user.id))
+            )
+
+            await Promise.all(promises)
+        })
+
+        revalidatePath('/users')
+    }
 }

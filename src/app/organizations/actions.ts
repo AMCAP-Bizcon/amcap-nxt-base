@@ -111,3 +111,95 @@ export async function updateOrganizationTodos(organizationId: number, todoIds: n
 
     revalidatePath('/organizations')
 }
+
+/**
+ * Updates the sequence of multiple organizations for drag-and-drop reordering.
+ *
+ * @param {Array<{ id: number; sequence: number }>} updates - An array containing the IDs and new sequences
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateOrgSequence(updates: { id: number; sequence: number }[]) {
+    await requireUser()
+
+    if (updates.length > 0) {
+        await db.transaction(async (tx) => {
+            const promises = updates.map((update) =>
+                tx.update(organizations)
+                    .set({ sequence: update.sequence })
+                    .where(eq(organizations.id, update.id))
+            );
+            await Promise.all(promises);
+        });
+        revalidatePath('/organizations')
+    }
+}
+
+/**
+ * Updates the names of multiple organizations (batch edit).
+ *
+ * @param {Array<{ id: number; name: string }>} updates - An array containing the IDs and updated names
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function updateOrgNames(updates: { id: number; name: string }[]) {
+    await requireUser()
+
+    if (updates.length > 0) {
+        await db.transaction(async (tx) => {
+            const promises = updates.map((update) =>
+                tx.update(organizations)
+                    .set({ name: update.name })
+                    .where(eq(organizations.id, update.id))
+            );
+            await Promise.all(promises);
+        });
+        revalidatePath('/organizations')
+    }
+}
+
+/**
+ * Toggles the "done" status for multiple organizations.
+ *
+ * @param {number[]} ids - An array of Organization IDs to toggle
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function toggleOrgsDoneStatus(ids: number[]) {
+    await requireUser()
+
+    if (ids.length > 0) {
+        await db.transaction(async (tx) => {
+            // First get the current statuses
+            const currentOrgs = await tx.query.organizations.findMany({
+                where: inArray(organizations.id, ids),
+                columns: {
+                    id: true,
+                    done: true
+                }
+            })
+
+            const promises = currentOrgs.map(org =>
+                tx.update(organizations)
+                    .set({ done: !org.done })
+                    .where(eq(organizations.id, org.id))
+            )
+
+            await Promise.all(promises)
+        })
+
+        revalidatePath('/organizations')
+    }
+}
+
+/**
+ * Deletes multiple organizations at once.
+ *
+ * @param {number[]} ids - An array of Organization IDs to delete
+ * @throws {Error} If the user is unauthenticated
+ */
+export async function deleteMultipleOrgs(ids: number[]) {
+    await requireUser()
+
+    if (ids.length > 0) {
+        await db.delete(organizations).where(inArray(organizations.id, ids));
+        revalidatePath('/organizations');
+    }
+}

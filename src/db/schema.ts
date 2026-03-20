@@ -63,6 +63,9 @@ export const profiles = pgTable('profiles', {
     email: text('email').notNull(),
     displayName: text('display_name'),
     phone: text('phone'),
+    done: boolean('done').default(false).notNull(),
+    isPinned: boolean('is_pinned').default(false).notNull(),
+    sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -94,6 +97,9 @@ export const organizations = pgTable('organizations', {
     id: serial('id').primaryKey(),
     name: text('name').notNull(),
     description: text('description'),
+    done: boolean('done').default(false).notNull(),
+    isPinned: boolean('is_pinned').default(false).notNull(),
+    sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
