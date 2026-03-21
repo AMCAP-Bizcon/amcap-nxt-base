@@ -30,8 +30,12 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+export type RoleWithCreator = Role & {
+    creatorDisplayName?: string;
+};
+
 interface RolesListProps {
-    initialRoles: Role[]
+    initialRoles: RoleWithCreator[]
     initialUserRoles: UserRole[]
     initialAccessRules: AccessRule[]
     allProfiles: Profile[]
@@ -40,7 +44,7 @@ interface RolesListProps {
     activeTab: string
 }
 
-function SortableRoleItem({ id, role, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: number, role: Role, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void, selectedId: number | null }) {
+function SortableRoleItem({ id, role, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: number, role: RoleWithCreator, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void, selectedId: number | null }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
 
     const style = { transform: CSS.Transform.toString(transform), transition }
@@ -61,9 +65,15 @@ function SortableRoleItem({ id, role, isReordering, isEditing, isIdle, isCurrent
                         {role.description}
                     </span>
                 )}
-                <span className="text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
-                    Created {new Date(role.createdAt).toLocaleDateString('en-GB')}
-                </span>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
+                    <span>Created on {new Date(role.createdAt).toLocaleDateString('en-GB')}</span>
+                    {role.creatorDisplayName && (
+                        <>
+                            <span>&bull;</span>
+                            <span>by {role.creatorDisplayName}</span>
+                        </>
+                    )}
+                </div>
             </div>
         </li>
     )

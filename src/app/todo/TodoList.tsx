@@ -34,6 +34,7 @@ import { type Todo, type TodoRelationship, type Organization, type TodoOrganizat
 export type TodoWithMedia = Todo & {
     images: { url: string; path: string }[];
     files: { name?: string; url: string; path: string }[];
+    creatorDisplayName?: string;
 };
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 
@@ -53,9 +54,15 @@ function SortableItem({ id, todo, isReordering, isEditing, isIdle, isCurrentlyEd
                 ) : (
                     <span className={`font-medium break-words whitespace-pre-wrap ${todo.done ? 'line-through text-muted-foreground' : ''}`}>{todo.text}</span>
                 )}
-                <span className="text-xs text-muted-foreground cursor-default" suppressHydrationWarning>
-                    {new Date(todo.createdAt).toLocaleString('en-GB')}
-                </span>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
+                    <span>Created on {new Date(todo.createdAt).toLocaleDateString('en-GB')}</span>
+                    {todo.creatorDisplayName && (
+                        <>
+                            <span>&bull;</span>
+                            <span>by {todo.creatorDisplayName}</span>
+                        </>
+                    )}
+                </div>
             </div>
         </li>
     )

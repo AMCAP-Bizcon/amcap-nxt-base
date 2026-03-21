@@ -1,6 +1,7 @@
 import { db } from '@/db'
 import { profiles, userManagementRelationships, organizations, userOrganizations, roles, userRoles } from '@/db/schema'
 import { eq, or } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { createClient } from '@/utils/supabase/server'
 import { UserList } from './UserList'
 
@@ -18,11 +19,25 @@ export default async function UsersPage(props: {
     if (!user) return null;
 
     // 2. Fetch profiles with a soft limit
-    const allProfiles = await db
-        .select()
+    const creatorProfiles = alias(profiles, 'creatorProfiles')
+    
+    const allProfilesRaw = await db
+        .select({
+            profile: profiles,
+            creator: {
+                displayName: creatorProfiles.displayName,
+                email: creatorProfiles.email
+            }
+        })
         .from(profiles)
+        .leftJoin(creatorProfiles, eq(profiles.createdBy, creatorProfiles.id))
         .orderBy(profiles.email)
         .limit(100);
+
+    const allProfiles = allProfilesRaw.map(({ profile, creator }) => ({
+        ...profile,
+        creatorDisplayName: creator?.displayName || creator?.email || 'Unknown User'
+    }))
 
     // 3. Targeted relational queries based on selectedId
     let allRelationships: typeof userManagementRelationships.$inferSelect[] = [];

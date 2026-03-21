@@ -12,6 +12,7 @@ import { OrganizationUsersSublist, type OrganizationUsersSublistRef } from './Or
 import { OrganizationTodosSublist, type OrganizationTodosSublistRef } from './OrganizationTodosSublist'
 import { OrganizationRolesSublist, type OrganizationRolesSublistRef, type OrgRoleAssignment } from './OrganizationRolesSublist'
 import { useRouter } from 'next/navigation'
+import { ChangelogViewer } from '@/components/ui/changelog-viewer'
 
 interface OrganizationDetailsPanelProps {
     organization: Organization | null
@@ -278,6 +279,8 @@ export function OrganizationDetailsPanel({
                     disableTabSwitch={sublistBusy}
                 />
             </div>
+            
+            <ChangelogViewer tableName="organizations" recordId={organization.id} />
         </StandardDetailForm>
     )
 }

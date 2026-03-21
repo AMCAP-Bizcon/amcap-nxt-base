@@ -18,10 +18,22 @@ export default async function OrganizationsPage(props: {
     if (!user) return null;
 
     // 2. Fetch all organizations
-    const allOrganizations = await db
-        .select()
+    const allOrganizationsRaw = await db
+        .select({
+            org: organizations,
+            creator: {
+                displayName: profiles.displayName,
+                email: profiles.email
+            }
+        })
         .from(organizations)
+        .leftJoin(profiles, eq(organizations.createdBy, profiles.id))
         .orderBy(organizations.name)
+
+    const allOrganizations = allOrganizationsRaw.map(({ org, creator }) => ({
+        ...org,
+        creatorDisplayName: creator?.displayName || creator?.email || 'Unknown User'
+    }))
 
     // Fetch related records
     const allUsers = await db.select().from(profiles).orderBy(profiles.displayName, profiles.email);

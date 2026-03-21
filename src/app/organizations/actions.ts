@@ -6,6 +6,7 @@ import { organizations, userOrganizations, todoOrganizations, profiles, todos, t
 import { requireUser } from '@/utils/supabase/server'
 import { requirePermission } from '@/utils/rbac'
 import { eq, inArray } from 'drizzle-orm'
+import { logChange } from '@/utils/changelogs'
 
 /**
  * Creates a new Organization.
@@ -14,12 +15,15 @@ import { eq, inArray } from 'drizzle-orm'
  * @throws {Error} If the user is unauthenticated
  */
 export async function createOrganization(name: string) {
-    await requireUser()
+    const user = await requireUser()
     await requirePermission('organizations', 'create')
 
     const [newOrg] = await db.insert(organizations).values({
         name,
+        createdBy: user.id
     }).returning()
+
+    await logChange('organizations', newOrg.id, 'CREATE', newOrg)
 
     revalidatePath('/organizations')
 
@@ -42,6 +46,8 @@ export async function updateOrganizationDetails(id: number, details: Partial<Pic
             .update(organizations)
             .set(details)
             .where(eq(organizations.id, id))
+        
+        await logChange('organizations', id, 'UPDATE', details)
     }
 
     revalidatePath('/organizations')
@@ -58,6 +64,7 @@ export async function deleteOrganization(id: number) {
     await requirePermission('organizations', 'delete')
 
     await db.delete(organizations).where(eq(organizations.id, id))
+    await logChange('organizations', id, 'DELETE', { action: 'deleted record' })
 
     revalidatePath('/organizations')
 }
@@ -87,6 +94,8 @@ export async function updateOrganizationUsers(organizationId: number, userIds: s
         }
     });
 
+    await logChange('organizations', organizationId, 'UPDATE', { userIds })
+
     revalidatePath('/organizations')
 }
 
@@ -115,6 +124,8 @@ export async function updateOrganizationTodos(organizationId: number, todoIds: n
         }
     });
 
+    await logChange('organizations', organizationId, 'UPDATE', { todoIds })
+
     revalidatePath('/organizations')
 }
 
@@ -137,6 +148,11 @@ export async function updateOrgSequence(updates: { id: number; sequence: number 
             );
             await Promise.all(promises);
         });
+
+        for (const update of updates) {
+            await logChange('organizations', update.id, 'UPDATE', { sequence: update.sequence })
+        }
+
         revalidatePath('/organizations')
     }
 }
@@ -160,6 +176,11 @@ export async function updateOrgNames(updates: { id: number; name: string }[]) {
             );
             await Promise.all(promises);
         });
+
+        for (const update of updates) {
+            await logChange('organizations', update.id, 'UPDATE', { name: update.name })
+        }
+
         revalidatePath('/organizations')
     }
 }
@@ -194,6 +215,10 @@ export async function toggleOrgsDoneStatus(ids: number[]) {
             await Promise.all(promises)
         })
 
+        for (const id of ids) {
+            await logChange('organizations', id, 'UPDATE', { action: 'toggled done status' })
+        }
+
         revalidatePath('/organizations')
     }
 }
@@ -210,6 +235,11 @@ export async function deleteMultipleOrgs(ids: number[]) {
 
     if (ids.length > 0) {
         await db.delete(organizations).where(inArray(organizations.id, ids));
+
+        for (const id of ids) {
+            await logChange('organizations', id, 'DELETE', { action: 'deleted record' })
+        }
+
         revalidatePath('/organizations');
     }
 }
@@ -239,6 +269,8 @@ export async function updateOrganizationRoles(organizationId: number, assignment
             await tx.insert(userRoles).values(values);
         }
     });
+
+    await logChange('organizations', organizationId, 'UPDATE', { roleAssignments: assignments })
 
     revalidatePath('/organizations')
     revalidatePath('/roles')

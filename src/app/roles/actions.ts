@@ -6,6 +6,7 @@ import { roles, userRoles, type Role, accessRules } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
 import { requirePermission } from '@/utils/rbac'
 import { eq, inArray } from 'drizzle-orm'
+import { logChange } from '@/utils/changelogs'
 
 /**
  * Creates a new Role.
@@ -14,12 +15,15 @@ import { eq, inArray } from 'drizzle-orm'
  * @throws {Error} If the user is unauthenticated
  */
 export async function createRole(name: string) {
-    await requireUser()
+    const user = await requireUser()
     await requirePermission('roles', 'create')
 
     const [newRole] = await db.insert(roles).values({
         name,
+        createdBy: user.id
     }).returning()
+
+    await logChange('roles', newRole.id, 'CREATE', newRole)
 
     revalidatePath('/roles')
 
@@ -42,6 +46,8 @@ export async function updateRoleDetails(id: number, details: Partial<Pick<Role, 
             .update(roles)
             .set(details)
             .where(eq(roles.id, id))
+            
+        await logChange('roles', id, 'UPDATE', details)
     }
 
     revalidatePath('/roles')
@@ -58,6 +64,7 @@ export async function deleteRole(id: number) {
     await requirePermission('roles', 'delete')
 
     await db.delete(roles).where(eq(roles.id, id))
+    await logChange('roles', id, 'DELETE', { action: 'deleted record' })
 
     revalidatePath('/roles')
 }
@@ -78,6 +85,11 @@ export async function updateRoleSequence(updates: { id: number; sequence: number
             );
             await Promise.all(promises);
         });
+
+        for (const update of updates) {
+            await logChange('roles', update.id, 'UPDATE', { sequence: update.sequence })
+        }
+
         revalidatePath('/roles')
     }
 }
@@ -98,6 +110,11 @@ export async function updateRoleNames(updates: { id: number; name: string }[]) {
             );
             await Promise.all(promises);
         });
+
+        for (const update of updates) {
+            await logChange('roles', update.id, 'UPDATE', { name: update.name })
+        }
+
         revalidatePath('/roles')
     }
 }
@@ -125,6 +142,10 @@ export async function toggleRolesDoneStatus(ids: number[]) {
             await Promise.all(promises)
         })
 
+        for (const id of ids) {
+            await logChange('roles', id, 'UPDATE', { action: 'toggled done status' })
+        }
+
         revalidatePath('/roles')
     }
 }
@@ -138,6 +159,11 @@ export async function deleteMultipleRoles(ids: number[]) {
 
     if (ids.length > 0) {
         await db.delete(roles).where(inArray(roles.id, ids));
+
+        for (const id of ids) {
+            await logChange('roles', id, 'DELETE', { action: 'deleted record' })
+        }
+
         revalidatePath('/roles');
     }
 }
@@ -163,6 +189,8 @@ export async function updateRoleUsers(roleId: number, assignments: { userId: str
             await tx.insert(userRoles).values(values);
         }
     });
+
+    await logChange('roles', roleId, 'UPDATE', { userAssignments: assignments })
 
     revalidatePath('/roles')
     revalidatePath('/users')
@@ -197,6 +225,8 @@ export async function updateRoleAccessRules(
             await tx.insert(accessRules).values(values);
         }
     });
+
+    await logChange('roles', roleId, 'UPDATE', { accessRules: rules })
 
     revalidatePath('/roles')
 }

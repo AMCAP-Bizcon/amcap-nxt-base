@@ -11,6 +11,7 @@ import { updateProfile, updateUserManagementRelationships, updateUserOrganizatio
 import { UserRelationshipSubList, type UserRelationshipSubListRef } from './UserRelationshipSubList'
 import { UserOrganizationsSublist, type UserOrganizationsSublistRef } from './UserOrganizationsSublist'
 import { UserRolesSublist, type UserRolesSublistRef, type UserRoleAssignment } from './UserRolesSublist'
+import { ChangelogViewer } from '@/components/ui/changelog-viewer'
 
 interface UserDetailsPanelProps {
     profile: Profile | null
@@ -332,6 +333,8 @@ export function UserDetailsPanel({
                     disableTabSwitch={sublistBusy}
                 />
             </div>
+
+            <ChangelogViewer tableName="users" recordId={profile.id} />
         </StandardDetailForm>
     )
 }

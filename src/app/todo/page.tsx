@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { todos, todoRelationships, todoMedia, organizations, todoOrganizations } from '@/db/schema'
+import { todos, todoRelationships, todoMedia, organizations, todoOrganizations, profiles } from '@/db/schema'
 import { eq, inArray, or } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
 import { TodoList } from './TodoList'
@@ -20,11 +20,23 @@ export default async function ToDoPage(props: {
     }
 
     // 2. Fetch ONLY the todos belonging to this user
-    const userTodos = await db
-        .select()
+    const userTodosRaw = await db
+        .select({
+            todo: todos,
+            creator: {
+                displayName: profiles.displayName,
+                email: profiles.email
+            }
+        })
         .from(todos)
+        .leftJoin(profiles, eq(todos.createdBy, profiles.id))
         .where(eq(todos.userId, user!.id))
         .orderBy(todos.sequence, todos.createdAt)
+
+    const userTodos = userTodosRaw.map(({ todo, creator }) => ({
+        ...todo,
+        creatorDisplayName: creator?.displayName || creator?.email || 'Unknown User'
+    }))
 
     const userTodoIds = userTodos.map(t => t.id);
 

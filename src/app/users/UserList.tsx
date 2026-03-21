@@ -30,8 +30,12 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+export type ProfileWithCreator = Profile & {
+    creatorDisplayName?: string;
+};
+
 interface UserListProps {
-    initialProfiles: Profile[]
+    initialProfiles: ProfileWithCreator[]
     initialRelationships: UserManagementRelationship[]
     initialOrganizations: Organization[]
     initialUserOrgs: UserOrganization[]
@@ -41,7 +45,7 @@ interface UserListProps {
     activeTab: string
 }
 
-function SortableUserItem({ id, profile, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: string, profile: Profile, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: string) => void, onOpenDetails: (id: string) => void, onTextChange: (id: string, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: string) => void, selectedId: string | null }) {
+function SortableUserItem({ id, profile, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: string, profile: ProfileWithCreator, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: string) => void, onOpenDetails: (id: string) => void, onTextChange: (id: string, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: string) => void, selectedId: string | null }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
 
     const style = { transform: CSS.Transform.toString(transform), transition }
@@ -62,9 +66,15 @@ function SortableUserItem({ id, profile, isReordering, isEditing, isIdle, isCurr
                         {profile.email}
                     </span>
                 )}
-                <span className="text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
-                    Joined {new Date(profile.createdAt).toLocaleDateString('en-GB')}
-                </span>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
+                    <span>Joined {new Date(profile.createdAt).toLocaleDateString('en-GB')}</span>
+                    {profile.creatorDisplayName && (
+                        <>
+                            <span>&bull;</span>
+                            <span>Created by {profile.creatorDisplayName}</span>
+                        </>
+                    )}
+                </div>
             </div>
         </li>
     )

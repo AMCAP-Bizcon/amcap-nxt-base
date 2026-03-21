@@ -22,6 +22,7 @@ export const todos = pgTable('todos', {
     userId: uuid('user_id').notNull(),
     sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdBy: uuid('created_by').references(() => profiles.id),
 });
 
 export const todoMedia = pgTable('todo_media', {
@@ -67,6 +68,7 @@ export const profiles = pgTable('profiles', {
     isPinned: boolean('is_pinned').default(false).notNull(),
     sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdBy: uuid('created_by').references(() => profiles.id),
 });
 
 /**
@@ -101,6 +103,7 @@ export const organizations = pgTable('organizations', {
     isPinned: boolean('is_pinned').default(false).notNull(),
     sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdBy: uuid('created_by').references(() => profiles.id),
 });
 
 /**
@@ -138,6 +141,7 @@ export const roles = pgTable('roles', {
     isPinned: boolean('is_pinned').default(false).notNull(),
     sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdBy: uuid('created_by').references(() => profiles.id),
 });
 
 /**
@@ -168,3 +172,15 @@ export type AccessRule = InferSelectModel<typeof accessRules>;
 
 export const AVAILABLE_APP_TABLES = ['todos', 'organizations', 'users', 'roles'] as const;
 export type AppTableName = typeof AVAILABLE_APP_TABLES[number];
+
+export const changelogs = pgTable('changelogs', {
+    id: serial('id').primaryKey(),
+    tableName: varchar('table_name', { length: 50 }).notNull(),
+    recordId: varchar('record_id', { length: 50 }).notNull(),
+    userId: uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    action: varchar('action', { length: 20 }).notNull(),
+    changes: jsonb('changes').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type Changelog = InferSelectModel<typeof changelogs>;

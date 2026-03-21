@@ -30,8 +30,12 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+export type OrganizationWithCreator = Organization & {
+    creatorDisplayName?: string;
+};
+
 interface OrganizationsListProps {
-    initialOrganizations: Organization[]
+    initialOrganizations: OrganizationWithCreator[]
     initialUserOrgs: UserOrganization[]
     initialTodoOrgs: TodoOrganization[]
     allProfiles: Profile[]
@@ -42,7 +46,7 @@ interface OrganizationsListProps {
     activeTab: string
 }
 
-function SortableOrgItem({ id, org, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: number, org: Organization, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void, selectedId: number | null }) {
+function SortableOrgItem({ id, org, isReordering, isEditing, isIdle, isCurrentlyEditing, onStartEdit, onOpenDetails, onTextChange, isSelectable, isSelected, onSelectToggle, selectedId }: { id: number, org: OrganizationWithCreator, isReordering: boolean, isEditing: boolean, isIdle: boolean, isCurrentlyEditing: boolean, onStartEdit: (id: number) => void, onOpenDetails: (id: number) => void, onTextChange: (id: number, text: string) => void, isSelectable: boolean, isSelected: boolean, onSelectToggle: (id: number) => void, selectedId: number | null }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
 
     const style = { transform: CSS.Transform.toString(transform), transition }
@@ -63,9 +67,15 @@ function SortableOrgItem({ id, org, isReordering, isEditing, isIdle, isCurrently
                         {org.description}
                     </span>
                 )}
-                <span className="text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
-                    Created {new Date(org.createdAt).toLocaleDateString('en-GB')}
-                </span>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1 cursor-default" suppressHydrationWarning>
+                    <span>Created on {new Date(org.createdAt).toLocaleDateString('en-GB')}</span>
+                    {org.creatorDisplayName && (
+                        <>
+                            <span>&bull;</span>
+                            <span>by {org.creatorDisplayName}</span>
+                        </>
+                    )}
+                </div>
             </div>
         </li>
     )

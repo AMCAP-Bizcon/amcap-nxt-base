@@ -6,6 +6,7 @@ import { todos, todoRelationships, todoMedia, type Todo } from '@/db/schema'
 import { requireUser, createClient } from '@/utils/supabase/server'
 import { requirePermission } from '@/utils/rbac'
 import { eq, and, or, inArray, sql } from 'drizzle-orm'
+import { logChange } from '@/utils/changelogs'
 
 /**
  * Helper function to bulk delete media files from the Supabase Storage bucket
@@ -51,7 +52,10 @@ export async function createTodo(text: string) {
         text: text,
         userId: user.id,
         sequence: newSequence,
+        createdBy: user.id,
     }).returning()
+
+    await logChange('todos', newTodo.id, 'CREATE', newTodo)
 
     // 3. Tell Next.js to refresh the dashboard page to show the new data
     revalidatePath('/todo')
@@ -86,6 +90,7 @@ export async function deleteTodo(id: number) {
     // 3. Delete the record from the database only if it belongs to the authenticated user
     // We use the `and` operator to enforce both ID and user ownership constraints
     await db.delete(todos).where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+    await logChange('todos', id, 'DELETE', { action: 'deleted record' })
 
     // 4. Refresh the todo page data
     revalidatePath('/todo')
@@ -125,6 +130,10 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
             )
         )
 
+    for (const item of items) {
+        await logChange('todos', item.id, 'UPDATE', { sequence: item.sequence })
+    }
+
     // 3. Refresh the todo page data
     revalidatePath('/todo')
 }
@@ -163,6 +172,10 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
             )
         )
 
+    for (const item of items) {
+        await logChange('todos', item.id, 'UPDATE', { text: item.text })
+    }
+
     // 3. Refresh the todo page data
     revalidatePath('/todo')
 }
@@ -181,6 +194,8 @@ export async function toggleTodoPin(id: number) {
         .update(todos)
         .set({ isPinned: sql`NOT ${todos.isPinned}` })
         .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+
+    await logChange('todos', id, 'UPDATE', { action: 'toggled isPinned' })
 
     revalidatePath('/todo')
 }
@@ -203,6 +218,10 @@ export async function toggleTodosDoneStatus(ids: number[]) {
         .update(todos)
         .set({ done: sql`NOT ${todos.done}` })
         .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+
+    for (const id of ids) {
+        await logChange('todos', id, 'UPDATE', { action: 'toggled done status' })
+    }
 
     // 3. Refresh the todo page data
     revalidatePath('/todo')
@@ -237,6 +256,10 @@ export async function deleteMultipleTodos(ids: number[]) {
     await db
         .delete(todos)
         .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+
+    for (const id of ids) {
+        await logChange('todos', id, 'DELETE', { action: 'deleted record' })
+    }
 
     // 4. Refresh the todo page data
     revalidatePath('/todo')
@@ -320,6 +343,8 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
             .set(todoDetails)
             .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
     }
+
+    await logChange('todos', id, 'UPDATE', details)
 
     revalidatePath('/todo')
 }
@@ -431,6 +456,8 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
             }
         });
 
+        await logChange('todos', todoId, 'UPDATE', { parentIds, childIds });
+
         revalidatePath('/todo');
         return { success: true };
     } catch (error: any) {
@@ -464,6 +491,8 @@ export async function updateTodoOrganizations(todoId: number, organizationIds: n
             await tx.insert(todoOrganizations).values(values);
         }
     });
+
+    await logChange('todos', todoId, 'UPDATE', { organizationIds });
 
     revalidatePath('/todo');
 }

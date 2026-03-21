@@ -1,4 +1,5 @@
 import { db } from '@/db'
+import { eq } from 'drizzle-orm'
 import { roles, userRoles, profiles, organizations, accessRules } from '@/db/schema'
 import { createClient } from '@/utils/supabase/server'
 import { RolesList } from './RolesList'
@@ -17,10 +18,22 @@ export default async function RolesPage(props: {
     if (!user) return null;
 
     // 2. Fetch all roles
-    const allRoles = await db
-        .select()
+    const allRolesRaw = await db
+        .select({
+            role: roles,
+            creator: {
+                displayName: profiles.displayName,
+                email: profiles.email
+            }
+        })
         .from(roles)
+        .leftJoin(profiles, eq(roles.createdBy, profiles.id))
         .orderBy(roles.sequence)
+
+    const allRoles = allRolesRaw.map(({ role, creator }) => ({
+        ...role,
+        creatorDisplayName: creator?.displayName || creator?.email || 'Unknown User'
+    }))
 
     // Fetch related records
     const allProfiles = await db.select().from(profiles).orderBy(profiles.displayName, profiles.email);

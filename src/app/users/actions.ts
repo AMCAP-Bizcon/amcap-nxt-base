@@ -6,6 +6,7 @@ import { profiles, userManagementRelationships, type Profile, userRoles } from '
 import { requireUser } from '@/utils/supabase/server'
 import { requirePermission } from '@/utils/rbac'
 import { eq, and, or, sql, inArray } from 'drizzle-orm'
+import { logChange } from '@/utils/changelogs'
 
 /**
  * Updates the profile details for a specific user.
@@ -20,10 +21,14 @@ export async function updateProfile(id: string, details: Partial<Pick<Profile, '
     await requirePermission('users', 'update')
 
     // 2. Perform update
-    await db
-        .update(profiles)
-        .set(details)
-        .where(eq(profiles.id, id))
+    if (Object.keys(details).length > 0) {
+        await db
+            .update(profiles)
+            .set(details)
+            .where(eq(profiles.id, id))
+            
+        await logChange('users', id, 'UPDATE', details)
+    }
 
     // 3. Refresh the users page data
     revalidatePath('/users')
@@ -92,6 +97,8 @@ export async function updateUserManagementRelationships(userId: string, managerI
         }
     });
 
+    await logChange('users', userId, 'UPDATE', { management: { managerIds, managedUserIds } })
+
     revalidatePath('/users');
 }
 
@@ -119,6 +126,8 @@ export async function updateUserOrganizations(userId: string, organizationIds: n
         }
     });
 
+    await logChange('users', userId, 'UPDATE', { organizationIds })
+
     revalidatePath('/users');
 }
 
@@ -141,6 +150,11 @@ export async function updateUserSequence(updates: { id: string; sequence: number
             );
             await Promise.all(promises);
         });
+
+        for (const update of updates) {
+            await logChange('users', update.id, 'UPDATE', { sequence: update.sequence })
+        }
+
         revalidatePath('/users')
     }
 }
@@ -198,6 +212,10 @@ export async function toggleUsersDoneStatus(ids: string[]) {
             await Promise.all(promises)
         })
 
+        for (const id of ids) {
+            await logChange('users', id, 'UPDATE', { action: 'toggled done status' })
+        }
+
         revalidatePath('/users')
     }
 }
@@ -227,6 +245,8 @@ export async function updateUserRoles(userId: string, assignments: { roleId: num
             await tx.insert(userRoles).values(values);
         }
     });
+
+    await logChange('users', userId, 'UPDATE', { roleAssignments: assignments })
 
     revalidatePath('/users')
     revalidatePath('/roles')

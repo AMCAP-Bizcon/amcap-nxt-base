@@ -15,6 +15,7 @@ import { TodoOrganizationsSublist, type TodoOrganizationsSublistRef } from './To
 import { StandardDetailForm } from '@/components/templates/StandardDetailForm'
 import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 import { ImageViewer } from '@/components/ui/image-viewer'
+import { ChangelogViewer } from '@/components/ui/changelog-viewer'
 
 export interface TodoDetailsPanelRef {
     handleSave: () => Promise<void>;
@@ -512,6 +513,8 @@ export const TodoDetailsPanel = forwardRef<TodoDetailsPanelRef, TodoDetailsPanel
                 open={viewerState.open}
                 onOpenChange={(open) => setViewerState(prev => ({ ...prev, open }))}
             />
+            
+            <ChangelogViewer tableName="todos" recordId={todo.id} />
         </StandardDetailForm>
     )
 })

@@ -12,6 +12,7 @@ import { RoleAssignmentsSublist, type RoleAssignmentsSublistRef, type RoleAssign
 import { RoleAccessRulesSublist } from './RoleAccessRulesSublist'
 import { type AccessRule } from '@/db/schema'
 import { useRouter } from 'next/navigation'
+import { ChangelogViewer } from '@/components/ui/changelog-viewer'
 
 interface RoleDetailsPanelProps {
     role: Role | null
@@ -231,6 +232,8 @@ export function RoleDetailsPanel({
                     disableTabSwitch={sublistBusy}
                 />
             </div>
+
+            <ChangelogViewer tableName="roles" recordId={role.id} />
         </StandardDetailForm>
     )
 }
