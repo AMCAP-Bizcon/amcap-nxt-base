@@ -2,7 +2,8 @@ import { db } from '@/db'
 import { organizations, userOrganizations, todoOrganizations, profiles, todos, roles, userRoles } from '@/db/schema'
 import { createClient } from '@/utils/supabase/server'
 import { OrganizationsList } from './OrganizationsList'
-import { eq } from 'drizzle-orm'
+import { eq, or, inArray } from 'drizzle-orm'
+import { getPermittedOrganizations } from '@/utils/rbac'
 
 export default async function OrganizationsPage(props: {
     searchParams: Promise<{ [key: string]: string | undefined }>
@@ -17,7 +18,9 @@ export default async function OrganizationsPage(props: {
 
     if (!user) return null;
 
-    // 2. Fetch all organizations
+    // 2. Fetch permitted organizations
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'read');
+
     const allOrganizationsRaw = await db
         .select({
             org: organizations,
@@ -28,6 +31,12 @@ export default async function OrganizationsPage(props: {
         })
         .from(organizations)
         .leftJoin(profiles, eq(organizations.createdBy, profiles.id))
+        .where(
+            or(
+                eq(organizations.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : undefined
+            )
+        )
         .orderBy(organizations.name)
 
     const allOrganizations = allOrganizationsRaw.map(({ org, creator }) => ({
@@ -38,14 +47,17 @@ export default async function OrganizationsPage(props: {
     // Fetch related records
     const allUsers = await db.select().from(profiles).orderBy(profiles.displayName, profiles.email);
 
-    // Only fetch todos belonging to the user for now, or all todos?
-    // Since an organization can contain todos from multiple users, let's fetch all todos the user belongs to.
-    // Actually, according to the rules, we fetch User's todos. 
-    // "fetch ONLY the todos belonging to this user" was the rule for ToDo app, but for Orgs app it depends.
-    // I'll fetch *all* todos if they are shared, but for simplicity let's fetch user's todos.
-    // Let's fetch all todos and filter if needed, or query todos for the user.
-    // For now, let's fetch user's todos to assign to organization.
-    const userTodos = await db.select().from(todos).where(eq(todos.userId, user.id)).orderBy(todos.sequence);
+    const permittedTodoOrgIds = await getPermittedOrganizations('todos', 'read');
+    const userTodos = await db.select().from(todos)
+        .where(
+            or(
+                eq(todos.userId, user.id),
+                permittedTodoOrgIds.length > 0
+                    ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedTodoOrgIds)))
+                    : undefined
+            )
+        )
+        .orderBy(todos.sequence);
 
     const allUserOrganizations = await db.select().from(userOrganizations);
     const allTodoOrganizations = await db.select().from(todoOrganizations);

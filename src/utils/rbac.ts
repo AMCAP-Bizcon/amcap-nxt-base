@@ -16,6 +16,7 @@ const getUserAccessRules = cache(async (userId: string, organizationId?: number)
             canCreate: accessRules.canCreate,
             canUpdate: accessRules.canUpdate,
             canDelete: accessRules.canDelete,
+            organizationId: userRoles.organizationId,
         })
         .from(accessRules)
         .innerJoin(userRoles, eq(userRoles.roleId, accessRules.roleId))
@@ -57,4 +58,34 @@ export async function requirePermission(appName: string, action: PermissionActio
     if (!hasPermission) {
         throw new Error(`Forbidden: Missing '${action}' permission for '${appName}'`)
     }
+}
+
+/**
+ * Gets a list of organization IDs where the user has the specified permission for an app.
+ * 
+ * @param {string} appName - The app identifier
+ * @param {PermissionAction} action - The action being performed
+ * @returns {Promise<number[]>} Array of permitted organization IDs
+ */
+export async function getPermittedOrganizations(appName: string, action: PermissionAction): Promise<number[]> {
+    const user = await requireUser()
+    const rules = await getUserAccessRules(user.id)
+    
+    const permittedOrgIds = new Set<number>()
+    
+    for (const rule of rules) {
+        if (rule.tableName !== appName) continue
+        
+        const hasPerm = 
+            (action === 'read' && rule.canRead) ||
+            (action === 'create' && rule.canCreate) ||
+            (action === 'update' && rule.canUpdate) ||
+            (action === 'delete' && rule.canDelete)
+            
+        if (hasPerm && rule.organizationId !== null) {
+            permittedOrgIds.add(rule.organizationId)
+        }
+    }
+    
+    return Array.from(permittedOrgIds)
 }

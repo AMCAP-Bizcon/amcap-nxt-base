@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
 import { organizations, userOrganizations, todoOrganizations, profiles, todos, type Organization, userRoles } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
-import { requirePermission } from '@/utils/rbac'
-import { eq, inArray } from 'drizzle-orm'
+import { requirePermission, getPermittedOrganizations } from '@/utils/rbac'
+import { eq, inArray, or, and, sql } from 'drizzle-orm'
 import { logChange } from '@/utils/changelogs'
 
 /**
@@ -38,8 +38,23 @@ export async function createOrganization(name: string) {
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateOrganizationDetails(id: number, details: Partial<Pick<Organization, 'name' | 'description'>>) {
-    await requireUser()
-    await requirePermission('organizations', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
+
+    const [orgToUpdate] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+            and(
+                eq(organizations.id, id),
+                or(
+                    eq(organizations.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+                )
+            )
+        )
+
+    if (!orgToUpdate) return;
 
     if (Object.keys(details).length > 0) {
         await db
@@ -60,8 +75,23 @@ export async function updateOrganizationDetails(id: number, details: Partial<Pic
  * @throws {Error} If the user is unauthenticated
  */
 export async function deleteOrganization(id: number) {
-    await requireUser()
-    await requirePermission('organizations', 'delete')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'delete')
+
+    const [orgToDelete] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+            and(
+                eq(organizations.id, id),
+                or(
+                    eq(organizations.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+                )
+            )
+        )
+
+    if (!orgToDelete) return;
 
     await db.delete(organizations).where(eq(organizations.id, id))
     await logChange('organizations', id, 'DELETE', { action: 'deleted record' })
@@ -77,8 +107,23 @@ export async function deleteOrganization(id: number) {
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateOrganizationUsers(organizationId: number, userIds: string[]) {
-    await requireUser()
-    await requirePermission('organizations', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
+
+    const [orgToUpdate] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+            and(
+                eq(organizations.id, organizationId),
+                or(
+                    eq(organizations.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+                )
+            )
+        )
+
+    if (!orgToUpdate) return;
 
     await db.transaction(async (tx) => {
         // Delete existing mappings
@@ -107,8 +152,23 @@ export async function updateOrganizationUsers(organizationId: number, userIds: s
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateOrganizationTodos(organizationId: number, todoIds: number[]) {
-    await requireUser()
-    await requirePermission('organizations', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
+
+    const [orgToUpdate] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+            and(
+                eq(organizations.id, organizationId),
+                or(
+                    eq(organizations.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+                )
+            )
+        )
+
+    if (!orgToUpdate) return;
 
     await db.transaction(async (tx) => {
         // Delete existing mappings
@@ -136,12 +196,23 @@ export async function updateOrganizationTodos(organizationId: number, todoIds: n
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateOrgSequence(updates: { id: number; sequence: number }[]) {
-    await requireUser()
-    await requirePermission('organizations', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
 
     if (updates.length > 0) {
+        const validOrgs = await db.select({ id: organizations.id }).from(organizations).where(
+            or(
+                eq(organizations.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+            )
+        );
+        const validIds = new Set(validOrgs.map(o => o.id));
+        const validUpdates = updates.filter(u => validIds.has(u.id));
+
+        if (validUpdates.length === 0) return;
+
         await db.transaction(async (tx) => {
-            const promises = updates.map((update) =>
+            const promises = validUpdates.map((update) =>
                 tx.update(organizations)
                     .set({ sequence: update.sequence })
                     .where(eq(organizations.id, update.id))
@@ -149,7 +220,7 @@ export async function updateOrgSequence(updates: { id: number; sequence: number 
             await Promise.all(promises);
         });
 
-        for (const update of updates) {
+        for (const update of validUpdates) {
             await logChange('organizations', update.id, 'UPDATE', { sequence: update.sequence })
         }
 
@@ -164,12 +235,24 @@ export async function updateOrgSequence(updates: { id: number; sequence: number 
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateOrgNames(updates: { id: number; name: string }[]) {
-    await requireUser()
-    await requirePermission('organizations', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
 
     if (updates.length > 0) {
+        // Filter allowed organizations
+        const validOrgs = await db.select({ id: organizations.id }).from(organizations).where(
+            or(
+                eq(organizations.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+            )
+        );
+        const validIds = new Set(validOrgs.map(o => o.id));
+        const validUpdates = updates.filter(u => validIds.has(u.id));
+
+        if (validUpdates.length === 0) return;
+
         await db.transaction(async (tx) => {
-            const promises = updates.map((update) =>
+            const promises = validUpdates.map((update) =>
                 tx.update(organizations)
                     .set({ name: update.name })
                     .where(eq(organizations.id, update.id))
@@ -177,7 +260,7 @@ export async function updateOrgNames(updates: { id: number; name: string }[]) {
             await Promise.all(promises);
         });
 
-        for (const update of updates) {
+        for (const update of validUpdates) {
             await logChange('organizations', update.id, 'UPDATE', { name: update.name })
         }
 
@@ -192,14 +275,27 @@ export async function updateOrgNames(updates: { id: number; name: string }[]) {
  * @throws {Error} If the user is unauthenticated
  */
 export async function toggleOrgsDoneStatus(ids: number[]) {
-    await requireUser()
-    await requirePermission('organizations', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
 
     if (ids.length > 0) {
+        const validOrgs = await db.select({ id: organizations.id }).from(organizations).where(
+            and(
+                inArray(organizations.id, ids),
+                or(
+                    eq(organizations.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+                )
+            )
+        );
+        const validIds = validOrgs.map(o => o.id);
+
+        if (validIds.length === 0) return;
+
         await db.transaction(async (tx) => {
             // First get the current statuses
             const currentOrgs = await tx.query.organizations.findMany({
-                where: inArray(organizations.id, ids),
+                where: inArray(organizations.id, validIds),
                 columns: {
                     id: true,
                     done: true
@@ -215,7 +311,7 @@ export async function toggleOrgsDoneStatus(ids: number[]) {
             await Promise.all(promises)
         })
 
-        for (const id of ids) {
+        for (const id of validIds) {
             await logChange('organizations', id, 'UPDATE', { action: 'toggled done status' })
         }
 
@@ -230,13 +326,26 @@ export async function toggleOrgsDoneStatus(ids: number[]) {
  * @throws {Error} If the user is unauthenticated
  */
 export async function deleteMultipleOrgs(ids: number[]) {
-    await requireUser()
-    await requirePermission('organizations', 'delete')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'delete')
 
     if (ids.length > 0) {
-        await db.delete(organizations).where(inArray(organizations.id, ids));
+        const validOrgs = await db.select({ id: organizations.id }).from(organizations).where(
+            and(
+                inArray(organizations.id, ids),
+                or(
+                    eq(organizations.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+                )
+            )
+        );
+        const validIds = validOrgs.map(o => o.id);
 
-        for (const id of ids) {
+        if (validIds.length === 0) return;
+
+        await db.delete(organizations).where(inArray(organizations.id, validIds));
+
+        for (const id of validIds) {
             await logChange('organizations', id, 'DELETE', { action: 'deleted record' })
         }
 
@@ -252,8 +361,23 @@ export async function deleteMultipleOrgs(ids: number[]) {
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateOrganizationRoles(organizationId: number, assignments: { roleId: number, userId: string }[]) {
-    await requireUser()
-    await requirePermission('organizations', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
+
+    const [orgToUpdate] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+            and(
+                eq(organizations.id, organizationId),
+                or(
+                    eq(organizations.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(organizations.id, permittedOrgIds) : sql`FALSE`
+                )
+            )
+        )
+
+    if (!orgToUpdate) return;
 
     await db.transaction(async (tx) => {
         // Delete existing role assignments for this organization

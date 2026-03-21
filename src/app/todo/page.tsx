@@ -2,6 +2,7 @@ import { db } from '@/db'
 import { todos, todoRelationships, todoMedia, organizations, todoOrganizations, profiles } from '@/db/schema'
 import { eq, inArray, or } from 'drizzle-orm'
 import { createClient } from '@/utils/supabase/server'
+import { getPermittedOrganizations } from '@/utils/rbac'
 import { TodoList } from './TodoList'
 
 export default async function ToDoPage(props: {
@@ -19,7 +20,9 @@ export default async function ToDoPage(props: {
         return <div>Not authenticated</div>;
     }
 
-    // 2. Fetch ONLY the todos belonging to this user
+    // 2. Fetch todos belonging to this user or organizations they have access to
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'read')
+
     const userTodosRaw = await db
         .select({
             todo: todos,
@@ -30,7 +33,19 @@ export default async function ToDoPage(props: {
         })
         .from(todos)
         .leftJoin(profiles, eq(todos.createdBy, profiles.id))
-        .where(eq(todos.userId, user!.id))
+        .where(
+            or(
+                eq(todos.userId, user!.id),
+                permittedOrgIds.length > 0 
+                    ? inArray(
+                        todos.id, 
+                        db.select({ todoId: todoOrganizations.todoId })
+                          .from(todoOrganizations)
+                          .where(inArray(todoOrganizations.organizationId, permittedOrgIds))
+                    )
+                    : undefined
+            )
+        )
         .orderBy(todos.sequence, todos.createdAt)
 
     const userTodos = userTodosRaw.map(({ todo, creator }) => ({

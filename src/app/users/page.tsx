@@ -1,8 +1,9 @@
 import { db } from '@/db'
 import { profiles, userManagementRelationships, organizations, userOrganizations, roles, userRoles } from '@/db/schema'
-import { eq, or } from 'drizzle-orm'
+import { eq, or, inArray } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { createClient } from '@/utils/supabase/server'
+import { getPermittedOrganizations } from '@/utils/rbac'
 import { UserList } from './UserList'
 
 export default async function UsersPage(props: {
@@ -20,6 +21,7 @@ export default async function UsersPage(props: {
 
     // 2. Fetch profiles with a soft limit
     const creatorProfiles = alias(profiles, 'creatorProfiles')
+    const permittedOrgIds = await getPermittedOrganizations('users', 'read')
     
     const allProfilesRaw = await db
         .select({
@@ -31,6 +33,13 @@ export default async function UsersPage(props: {
         })
         .from(profiles)
         .leftJoin(creatorProfiles, eq(profiles.createdBy, creatorProfiles.id))
+        .where(
+            or(
+                eq(profiles.id, user.id),
+                eq(profiles.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : undefined
+            )
+        )
         .orderBy(profiles.email)
         .limit(100);
 

@@ -2,9 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
-import { profiles, userManagementRelationships, type Profile, userRoles } from '@/db/schema'
+import { profiles, userManagementRelationships, type Profile, userRoles, userOrganizations } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
-import { requirePermission } from '@/utils/rbac'
+import { requirePermission, getPermittedOrganizations } from '@/utils/rbac'
 import { eq, and, or, sql, inArray } from 'drizzle-orm'
 import { logChange } from '@/utils/changelogs'
 
@@ -16,9 +16,21 @@ import { logChange } from '@/utils/changelogs'
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateProfile(id: string, details: Partial<Pick<Profile, 'displayName' | 'phone'>>) {
-    // 1. Verify who is making the request
-    await requireUser()
-    await requirePermission('users', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('users', 'update')
+
+    const [profileToUpdate] = await db.select({ id: profiles.id }).from(profiles).where(
+        and(
+            eq(profiles.id, id),
+            or(
+                eq(profiles.id, user.id),
+                eq(profiles.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : sql`FALSE`
+            )
+        )
+    )
+
+    if (!profileToUpdate) return;
 
     // 2. Perform update
     if (Object.keys(details).length > 0) {
@@ -44,9 +56,21 @@ export async function updateProfile(id: string, details: Partial<Pick<Profile, '
  * @throws {Error} If updating would create a cycle or user is unauthenticated
  */
 export async function updateUserManagementRelationships(userId: string, managerIds: string[], managedUserIds: string[]) {
-    // 1. Verify who is making the request
-    await requireUser()
-    await requirePermission('users', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('users', 'update')
+
+    const [profileToUpdate] = await db.select({ id: profiles.id }).from(profiles).where(
+        and(
+            eq(profiles.id, userId),
+            or(
+                eq(profiles.id, user.id),
+                eq(profiles.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : sql`FALSE`
+            )
+        )
+    )
+
+    if (!profileToUpdate) return;
 
     await db.transaction(async (tx) => {
         // 1. Delete all existing relationships involving this userId
@@ -110,9 +134,22 @@ export async function updateUserManagementRelationships(userId: string, managerI
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateUserOrganizations(userId: string, organizationIds: number[]) {
-    await requireUser()
-    await requirePermission('users', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('users', 'update')
     const { userOrganizations } = await import('@/db/schema'); // dynamic import or add to top
+
+    const [profileToUpdate] = await db.select({ id: profiles.id }).from(profiles).where(
+        and(
+            eq(profiles.id, userId),
+            or(
+                eq(profiles.id, user.id),
+                eq(profiles.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : sql`FALSE`
+            )
+        )
+    )
+
+    if (!profileToUpdate) return;
 
     await db.transaction(async (tx) => {
         await tx.delete(userOrganizations).where(eq(userOrganizations.userId, userId));
@@ -138,12 +175,26 @@ export async function updateUserOrganizations(userId: string, organizationIds: n
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateUserSequence(updates: { id: string; sequence: number }[]) {
-    await requireUser()
-    await requirePermission('users', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('users', 'update')
 
     if (updates.length > 0) {
+        const { userOrganizations } = await import('@/db/schema');
+        
+        const validProfiles = await db.select({ id: profiles.id }).from(profiles).where(
+            or(
+                eq(profiles.id, user.id),
+                eq(profiles.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : sql`FALSE`
+            )
+        );
+        const validIds = new Set(validProfiles.map(p => p.id));
+        const validUpdates = updates.filter(u => validIds.has(u.id));
+
+        if (validUpdates.length === 0) return;
+
         await db.transaction(async (tx) => {
-            const promises = updates.map((update) =>
+            const promises = validUpdates.map((update) =>
                 tx.update(profiles)
                     .set({ sequence: update.sequence })
                     .where(eq(profiles.id, update.id))
@@ -151,7 +202,7 @@ export async function updateUserSequence(updates: { id: string; sequence: number
             await Promise.all(promises);
         });
 
-        for (const update of updates) {
+        for (const update of validUpdates) {
             await logChange('users', update.id, 'UPDATE', { sequence: update.sequence })
         }
 
@@ -166,12 +217,26 @@ export async function updateUserSequence(updates: { id: string; sequence: number
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateUserNames(updates: { id: string; displayName: string }[]) {
-    await requireUser()
-    await requirePermission('users', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('users', 'update')
 
     if (updates.length > 0) {
+        const { userOrganizations } = await import('@/db/schema');
+        
+        const validProfiles = await db.select({ id: profiles.id }).from(profiles).where(
+            or(
+                eq(profiles.id, user.id),
+                eq(profiles.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : sql`FALSE`
+            )
+        );
+        const validIds = new Set(validProfiles.map(p => p.id));
+        const validUpdates = updates.filter(u => validIds.has(u.id));
+
+        if (validUpdates.length === 0) return;
+
         await db.transaction(async (tx) => {
-            const promises = updates.map((update) =>
+            const promises = validUpdates.map((update) =>
                 tx.update(profiles)
                     .set({ displayName: update.displayName })
                     .where(eq(profiles.id, update.id))
@@ -189,14 +254,30 @@ export async function updateUserNames(updates: { id: string; displayName: string
  * @throws {Error} If the user is unauthenticated
  */
 export async function toggleUsersDoneStatus(ids: string[]) {
-    await requireUser()
-    await requirePermission('users', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('users', 'update')
 
     if (ids.length > 0) {
+        const { userOrganizations } = await import('@/db/schema');
+        
+        const validProfiles = await db.select({ id: profiles.id }).from(profiles).where(
+            and(
+                inArray(profiles.id, ids),
+                or(
+                    eq(profiles.id, user.id),
+                    eq(profiles.createdBy, user.id),
+                    permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : sql`FALSE`
+                )
+            )
+        );
+        const validIds = validProfiles.map(p => p.id);
+
+        if (validIds.length === 0) return;
+
         await db.transaction(async (tx) => {
             // First get the current statuses
             const currentUsers = await tx.query.profiles.findMany({
-                where: inArray(profiles.id, ids),
+                where: inArray(profiles.id, validIds),
                 columns: {
                     id: true,
                     done: true
@@ -212,7 +293,7 @@ export async function toggleUsersDoneStatus(ids: string[]) {
             await Promise.all(promises)
         })
 
-        for (const id of ids) {
+        for (const id of validIds) {
             await logChange('users', id, 'UPDATE', { action: 'toggled done status' })
         }
 
@@ -228,8 +309,22 @@ export async function toggleUsersDoneStatus(ids: string[]) {
  * @throws {Error} If the user is unauthenticated
  */
 export async function updateUserRoles(userId: string, assignments: { roleId: number, organizationId: number }[]) {
-    await requireUser()
-    await requirePermission('users', 'update')
+    const user = await requireUser()
+    const permittedOrgIds = await getPermittedOrganizations('users', 'update')
+
+    const { userOrganizations } = await import('@/db/schema');
+    const [profileToUpdate] = await db.select({ id: profiles.id }).from(profiles).where(
+        and(
+            eq(profiles.id, userId),
+            or(
+                eq(profiles.id, user.id),
+                eq(profiles.createdBy, user.id),
+                permittedOrgIds.length > 0 ? inArray(profiles.id, db.select({ userId: userOrganizations.userId }).from(userOrganizations).where(inArray(userOrganizations.organizationId, permittedOrgIds))) : sql`FALSE`
+            )
+        )
+    )
+
+    if (!profileToUpdate) return;
 
     await db.transaction(async (tx) => {
         // Delete existing role assignments for this user

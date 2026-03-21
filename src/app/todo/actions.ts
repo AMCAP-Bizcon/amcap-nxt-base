@@ -2,9 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/db'
-import { todos, todoRelationships, todoMedia, type Todo } from '@/db/schema'
+import { todos, todoRelationships, todoMedia, type Todo, todoOrganizations } from '@/db/schema'
 import { requireUser, createClient } from '@/utils/supabase/server'
-import { requirePermission } from '@/utils/rbac'
+import { requirePermission, getPermittedOrganizations } from '@/utils/rbac'
 import { eq, and, or, inArray, sql } from 'drizzle-orm'
 import { logChange } from '@/utils/changelogs'
 
@@ -78,19 +78,33 @@ export async function deleteTodo(id: number) {
     const supabase = await createClient()
 
     // 2. Verify ownership and delete media from the storage bucket
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'delete')
+
     const [todoToDel] = await db
         .select({ id: todos.id })
         .from(todos)
-        .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+        .where(
+            and(
+                eq(todos.id, id),
+                or(
+                    eq(todos.userId, user.id),
+                    permittedOrgIds.length > 0 
+                        ? inArray(
+                            todos.id, 
+                            db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds))
+                        )
+                        : sql`FALSE`
+                )
+            )
+        )
 
     if (todoToDel) {
         await deleteAssociatedMedia(supabase, [id]);
+        
+        // 3. Delete the record from the database
+        await db.delete(todos).where(eq(todos.id, id))
+        await logChange('todos', id, 'DELETE', { action: 'deleted record' })
     }
-
-    // 3. Delete the record from the database only if it belongs to the authenticated user
-    // We use the `and` operator to enforce both ID and user ownership constraints
-    await db.delete(todos).where(and(eq(todos.id, id), eq(todos.userId, user.id)))
-    await logChange('todos', id, 'DELETE', { action: 'deleted record' })
 
     // 4. Refresh the todo page data
     revalidatePath('/todo')
@@ -108,12 +122,26 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
     const user = await requireUser()
     await requirePermission('todos', 'update')
 
-    if (items.length === 0) return
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
+
+    // Find allowed todos
+    const allowedTodos = await db.select({ id: todos.id }).from(todos).where(
+        or(
+            eq(todos.userId, user.id),
+            permittedOrgIds.length > 0 
+                ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                : sql`FALSE`
+        )
+    );
+    const allowedIds = new Set(allowedTodos.map(t => t.id));
+    const validItems = items.filter(i => allowedIds.has(i.id));
+
+    if (validItems.length === 0) return;
 
     // 2. Perform optimistic bulk update using a CASE expression
     const sqlChunks: any[] = []
     sqlChunks.push(sql`(case`)
-    for (const item of items) {
+    for (const item of validItems) {
         sqlChunks.push(sql`when ${todos.id} = ${item.id} then ${item.sequence}::integer`)
     }
     sqlChunks.push(sql`else ${todos.sequence} end)`)
@@ -123,14 +151,9 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
     await db
         .update(todos)
         .set({ sequence: finalSql })
-        .where(
-            and(
-                inArray(todos.id, items.map((i) => i.id)),
-                eq(todos.userId, user.id)
-            )
-        )
+        .where(inArray(todos.id, validItems.map((i) => i.id)))
 
-    for (const item of items) {
+    for (const item of validItems) {
         await logChange('todos', item.id, 'UPDATE', { sequence: item.sequence })
     }
 
@@ -150,12 +173,26 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
     const user = await requireUser()
     await requirePermission('todos', 'update')
 
-    if (items.length === 0) return
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
+
+    // Find allowed todos
+    const allowedTodos = await db.select({ id: todos.id }).from(todos).where(
+        or(
+            eq(todos.userId, user.id),
+            permittedOrgIds.length > 0 
+                ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                : sql`FALSE`
+        )
+    );
+    const allowedIds = new Set(allowedTodos.map(t => t.id));
+    const validItems = items.filter(i => allowedIds.has(i.id));
+
+    if (validItems.length === 0) return;
 
     // 2. Perform optimistic bulk update using a CASE expression
     const sqlChunks: any[] = []
     sqlChunks.push(sql`(case`)
-    for (const item of items) {
+    for (const item of validItems) {
         sqlChunks.push(sql`when ${todos.id} = ${item.id} then ${item.text}::text`)
     }
     sqlChunks.push(sql`else ${todos.text} end)`)
@@ -165,14 +202,9 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
     await db
         .update(todos)
         .set({ text: finalSql })
-        .where(
-            and(
-                inArray(todos.id, items.map((i) => i.id)),
-                eq(todos.userId, user.id)
-            )
-        )
+        .where(inArray(todos.id, validItems.map((i) => i.id)))
 
-    for (const item of items) {
+    for (const item of validItems) {
         await logChange('todos', item.id, 'UPDATE', { text: item.text })
     }
 
@@ -190,12 +222,31 @@ export async function toggleTodoPin(id: number) {
     const user = await requireUser()
     await requirePermission('todos', 'update')
 
-    await db
-        .update(todos)
-        .set({ isPinned: sql`NOT ${todos.isPinned}` })
-        .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
 
-    await logChange('todos', id, 'UPDATE', { action: 'toggled isPinned' })
+    const [todoToPin] = await db
+        .select({ id: todos.id })
+        .from(todos)
+        .where(
+            and(
+                eq(todos.id, id),
+                or(
+                    eq(todos.userId, user.id),
+                    permittedOrgIds.length > 0 
+                        ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                        : sql`FALSE`
+                )
+            )
+        )
+
+    if (todoToPin) {
+        await db
+            .update(todos)
+            .set({ isPinned: sql`NOT ${todos.isPinned}` })
+            .where(eq(todos.id, id))
+
+        await logChange('todos', id, 'UPDATE', { action: 'toggled isPinned' })
+    }
 
     revalidatePath('/todo')
 }
@@ -213,13 +264,31 @@ export async function toggleTodosDoneStatus(ids: number[]) {
 
     if (ids.length === 0) return
 
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
+
+    // Find allowed todos
+    const allowedTodos = await db.select({ id: todos.id }).from(todos).where(
+        and(
+            inArray(todos.id, ids),
+            or(
+                eq(todos.userId, user.id),
+                permittedOrgIds.length > 0 
+                    ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                    : sql`FALSE`
+            )
+        )
+    );
+    const validIds = allowedTodos.map(t => t.id);
+
+    if (validIds.length === 0) return
+
     // 2. Perform bulk update
     await db
         .update(todos)
         .set({ done: sql`NOT ${todos.done}` })
-        .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+        .where(inArray(todos.id, validIds))
 
-    for (const id of ids) {
+    for (const id of validIds) {
         await logChange('todos', id, 'UPDATE', { action: 'toggled done status' })
     }
 
@@ -241,24 +310,36 @@ export async function deleteMultipleTodos(ids: number[]) {
 
     if (ids.length === 0) return
 
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'delete')
+
     // 2. Verify ownership and lookup existing media to delete from the storage bucket
     const todosToDelete = await db
         .select({ id: todos.id })
         .from(todos)
-        .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+        .where(
+            and(
+                inArray(todos.id, ids),
+                or(
+                    eq(todos.userId, user.id),
+                    permittedOrgIds.length > 0 
+                        ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                        : sql`FALSE`
+                )
+            )
+        )
 
     const validIds = todosToDelete.map(t => t.id)
     if (validIds.length > 0) {
         await deleteAssociatedMedia(supabase, validIds);
-    }
 
-    // 3. Perform bulk delete
-    await db
-        .delete(todos)
-        .where(and(inArray(todos.id, ids), eq(todos.userId, user.id)))
+        // 3. Perform bulk delete
+        await db
+            .delete(todos)
+            .where(inArray(todos.id, validIds))
 
-    for (const id of ids) {
-        await logChange('todos', id, 'DELETE', { action: 'deleted record' })
+        for (const id of validIds) {
+            await logChange('todos', id, 'DELETE', { action: 'deleted record' })
+        }
     }
 
     // 4. Refresh the todo page data
@@ -278,8 +359,20 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
     await requirePermission('todos', 'update')
     const supabase = await createClient()
 
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
+
     // Verify ownership
-    const [todo] = await db.select({ id: todos.id }).from(todos).where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+    const [todo] = await db.select({ id: todos.id }).from(todos).where(
+        and(
+            eq(todos.id, id),
+            or(
+                eq(todos.userId, user.id),
+                permittedOrgIds.length > 0 
+                    ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                    : sql`FALSE`
+            )
+        )
+    )
     if (!todo) return
 
     if (details.images !== undefined || details.files !== undefined) {
@@ -341,7 +434,7 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
         await db
             .update(todos)
             .set(todoDetails)
-            .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+            .where(eq(todos.id, id))
     }
 
     await logChange('todos', id, 'UPDATE', details)
@@ -364,8 +457,21 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
 
     try {
         await db.transaction(async (tx) => {
-            // First, verify the user owns the `todoId`
-            const [baseTodo] = await tx.select({ id: todos.id }).from(todos).where(and(eq(todos.id, todoId), eq(todos.userId, user.id)));
+            const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
+
+            // First, verify the user has access to the `todoId`
+            const [baseTodo] = await tx.select({ id: todos.id }).from(todos).where(
+                and(
+                    eq(todos.id, todoId),
+                    or(
+                        eq(todos.userId, user.id),
+                        permittedOrgIds.length > 0 
+                            ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                            : sql`FALSE`
+                    )
+                )
+            );
+            
             if (!baseTodo) {
                 tx.rollback();
                 return;
@@ -373,7 +479,18 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
 
             const allRelatedIds = [...new Set([...parentIds, ...childIds])];
             if (allRelatedIds.length > 0) {
-                const foundRelated = await tx.select({ id: todos.id }).from(todos).where(and(inArray(todos.id, allRelatedIds), eq(todos.userId, user.id)));
+                const foundRelated = await tx.select({ id: todos.id }).from(todos).where(
+                    and(
+                        inArray(todos.id, allRelatedIds),
+                        or(
+                            eq(todos.userId, user.id),
+                            permittedOrgIds.length > 0 
+                                ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                                : sql`FALSE`
+                        )
+                    )
+                );
+                
                 if (foundRelated.length !== allRelatedIds.length) {
                     tx.rollback();
                     return;
@@ -432,21 +549,17 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
             }
 
             // Cycle validation via Recursive CTE
-            // Join with todos to ensure we only traverse relationships where the parent belongs to the user
             const cycleCheck = await tx.execute(sql`
                 WITH RECURSIVE search_graph(child_id) AS (
                     SELECT r.child_id
                     FROM todo_relationships r
-                    INNER JOIN todos t ON t.id = r.parent_id
-                    WHERE r.parent_id = ${todoId} AND t.user_id = ${user.id}
+                    WHERE r.parent_id = ${todoId}
                     
                     UNION
                     
                     SELECT r.child_id
                     FROM todo_relationships r
                     INNER JOIN search_graph sg ON r.parent_id = sg.child_id
-                    INNER JOIN todos t ON t.id = r.parent_id
-                    WHERE t.user_id = ${user.id}
                 )
                 SELECT 1 FROM search_graph WHERE child_id = ${todoId} LIMIT 1;
             `);
@@ -477,8 +590,25 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
  */
 export async function updateTodoOrganizations(todoId: number, organizationIds: number[]) {
     await requireUser()
-    await requirePermission('todos', 'update')
-    const { todoOrganizations } = await import('@/db/schema'); // dynamic import or add to top
+    const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
+
+    // Find allowed todo
+    // Note: since this is updating organizations, the user must have access to the todo
+    // either because they created it, or they have access to an organization it is ALREADY part of.
+    const user = await requireUser();
+    const [todo] = await db.select({ id: todos.id }).from(todos).where(
+        and(
+            eq(todos.id, todoId),
+            or(
+                eq(todos.userId, user.id),
+                permittedOrgIds.length > 0 
+                    ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
+                    : sql`FALSE`
+            )
+        )
+    );
+
+    if (!todo) return;
 
     await db.transaction(async (tx) => {
         await tx.delete(todoOrganizations).where(eq(todoOrganizations.todoId, todoId));
