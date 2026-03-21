@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, timestamp, uuid, integer, jsonb, primaryKey, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, boolean, timestamp, uuid, integer, jsonb, primaryKey, varchar, AnyPgColumn } from 'drizzle-orm/pg-core';
 import { type InferSelectModel } from 'drizzle-orm';
 
 
@@ -68,7 +68,7 @@ export const profiles = pgTable('profiles', {
     isPinned: boolean('is_pinned').default(false).notNull(),
     sequence: integer('sequence').default(0).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
-    createdBy: uuid('created_by').references(() => profiles.id),
+    createdBy: uuid('created_by').references((): AnyPgColumn => profiles.id),
 });
 
 /**
