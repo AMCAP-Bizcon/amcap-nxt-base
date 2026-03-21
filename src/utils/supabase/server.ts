@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { db } from '@/db'
+import { profiles } from '@/db/schema'
 
 /**
  * Creates a Supabase client for use in Server Components and Server Actions.
@@ -45,5 +47,13 @@ export async function requireUser() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) throw new Error("Unauthorized")
+
+  // Ensure user profile exists (replaces the need for a Postgres trigger)
+  await db.insert(profiles).values({
+    id: user.id,
+    email: user.email!,
+    displayName: user.email!.split('@')[0], // Give them a reasonable default display name
+  }).onConflictDoNothing({ target: profiles.id })
+
   return user
 }

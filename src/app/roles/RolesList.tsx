@@ -6,7 +6,7 @@ import { MasterDetailLayout } from '@/components/templates/MasterDetailLayout'
 import { StandardList } from '@/components/templates/StandardList'
 import { RoleDetailsPanel } from './RoleDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
-import { type Role, type UserRole, type Profile, type Organization, type AccessRule, type AppTable } from '@/db/schema'
+import { type Role, type UserRole, type Profile, type Organization, type AccessRule } from '@/db/schema'
 import { cn } from '@/lib/utils'
 import { createRole, updateRoleSequence, updateRoleNames, toggleRolesDoneStatus, deleteMultipleRoles } from './actions'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
@@ -34,7 +34,6 @@ interface RolesListProps {
     initialRoles: Role[]
     initialUserRoles: UserRole[]
     initialAccessRules: AccessRule[]
-    allAppTables: AppTable[]
     allProfiles: Profile[]
     allOrganizations: Organization[]
     selectedId: number | null
@@ -74,7 +73,6 @@ export function RolesList({
     initialRoles,
     initialUserRoles,
     initialAccessRules,
-    allAppTables,
     allProfiles,
     allOrganizations,
     selectedId,
@@ -288,7 +286,6 @@ export function RolesList({
             role={roles.find(r => r.id === selectedId) || null}
             userRoles={userRoles}
             accessRules={accessRules}
-            allAppTables={allAppTables}
             allProfiles={allProfiles}
             allOrganizations={allOrganizations}
             readOnly={detailsMode === 'idle'}

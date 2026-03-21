@@ -174,7 +174,7 @@ export async function updateRoleUsers(roleId: number, assignments: { userId: str
  */
 export async function updateRoleAccessRules(
     roleId: number, 
-    rules: { tableId: number, canRead: boolean, canCreate: boolean, canUpdate: boolean, canDelete: boolean, isActive: boolean }[]
+    rules: { tableName: string, canRead: boolean, canCreate: boolean, canUpdate: boolean, canDelete: boolean, isActive: boolean }[]
 ) {
     await requireUser()
     await requirePermission('roles', 'update')
@@ -187,7 +187,7 @@ export async function updateRoleAccessRules(
         if (rules.length > 0) {
             const values = rules.map((r) => ({
                 roleId,
-                tableId: r.tableId,
+                tableName: r.tableName,
                 canRead: r.canRead,
                 canCreate: r.canCreate,
                 canUpdate: r.canUpdate,

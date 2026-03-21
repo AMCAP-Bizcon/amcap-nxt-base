@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { roles, userRoles, profiles, organizations, accessRules, appTables } from '@/db/schema'
+import { roles, userRoles, profiles, organizations, accessRules } from '@/db/schema'
 import { createClient } from '@/utils/supabase/server'
 import { RolesList } from './RolesList'
 
@@ -27,7 +27,6 @@ export default async function RolesPage(props: {
     const allOrganizations = await db.select().from(organizations).orderBy(organizations.name);
     const allUserRoles = await db.select().from(userRoles);
     const allAccessRules = await db.select().from(accessRules);
-    const allAppTables = await db.select().from(appTables).orderBy(appTables.tableName);
 
     return (
         <div className="flex justify-center p-8 w-full flex-1 min-h-0 bg-transparent">
@@ -35,7 +34,7 @@ export default async function RolesPage(props: {
                 initialRoles={allRoles}
                 initialUserRoles={allUserRoles}
                 initialAccessRules={allAccessRules}
-                allAppTables={allAppTables}
+
                 allProfiles={allProfiles}
                 allOrganizations={allOrganizations}
                 selectedId={selectedId}

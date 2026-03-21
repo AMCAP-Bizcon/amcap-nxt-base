@@ -151,15 +151,10 @@ export const userRoles = pgTable('user_roles', {
     primaryKey({ columns: [t.userId, t.roleId, t.organizationId] })
 ]);
 
-export const appTables = pgTable('app_tables', {
-    id: serial('id').primaryKey(),
-    tableName: varchar('table_name', { length: 50 }).notNull().unique(), // e.g. 'todos', 'profiles', 'organizations', 'roles'
-});
-
 export const accessRules = pgTable('access_rules', {
     id: serial('id').primaryKey(),
     roleId: integer('role_id').notNull().references(() => roles.id, { onDelete: 'cascade' }),
-    tableId: integer('table_id').notNull().references(() => appTables.id, { onDelete: 'cascade' }),
+    tableName: varchar('table_name', { length: 50 }).notNull(),
     canRead: boolean('can_read').default(false).notNull(),
     canCreate: boolean('can_create').default(false).notNull(),
     canUpdate: boolean('can_update').default(false).notNull(),
@@ -170,4 +165,6 @@ export const accessRules = pgTable('access_rules', {
 export type Role = InferSelectModel<typeof roles>;
 export type UserRole = InferSelectModel<typeof userRoles>;
 export type AccessRule = InferSelectModel<typeof accessRules>;
-export type AppTable = InferSelectModel<typeof appTables>;
+
+export const AVAILABLE_APP_TABLES = ['todos', 'organizations', 'users', 'roles'] as const;
+export type AppTableName = typeof AVAILABLE_APP_TABLES[number];

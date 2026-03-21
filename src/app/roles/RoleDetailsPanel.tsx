@@ -10,14 +10,13 @@ import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 import { updateRoleDetails, deleteRole, updateRoleUsers } from './actions'
 import { RoleAssignmentsSublist, type RoleAssignmentsSublistRef, type RoleAssignment } from './RoleAssignmentsSublist'
 import { RoleAccessRulesSublist } from './RoleAccessRulesSublist'
-import { type AccessRule, type AppTable } from '@/db/schema'
+import { type AccessRule } from '@/db/schema'
 import { useRouter } from 'next/navigation'
 
 interface RoleDetailsPanelProps {
     role: Role | null
     userRoles: UserRole[]
     accessRules: AccessRule[]
-    allAppTables: AppTable[]
     allProfiles: Profile[]
     allOrganizations: Organization[]
     readOnly?: boolean
@@ -33,7 +32,6 @@ export function RoleDetailsPanel({
     role,
     userRoles,
     accessRules,
-    allAppTables,
     allProfiles,
     allOrganizations,
     readOnly = false,
@@ -223,7 +221,6 @@ export function RoleDetailsPanel({
                                 <RoleAccessRulesSublist
                                     roleId={role.id}
                                     accessRules={accessRules}
-                                    allAppTables={allAppTables}
                                     readOnly={readOnly}
                                 />
                             )

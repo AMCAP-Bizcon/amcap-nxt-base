@@ -1,9 +1,31 @@
 import { requireUser } from './supabase/server'
 import { db } from '@/db'
-import { userRoles, accessRules, appTables } from '@/db/schema'
+import { userRoles, accessRules } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
+import { cache } from 'react'
 
 export type PermissionAction = 'read' | 'create' | 'update' | 'delete'
+
+// Cache all access rules for the user for the lifetime of the request
+const getUserAccessRules = cache(async (userId: string) => {
+    return await db
+        .select({
+            id: accessRules.id,
+            tableName: accessRules.tableName,
+            canRead: accessRules.canRead,
+            canCreate: accessRules.canCreate,
+            canUpdate: accessRules.canUpdate,
+            canDelete: accessRules.canDelete,
+        })
+        .from(accessRules)
+        .innerJoin(userRoles, eq(userRoles.roleId, accessRules.roleId))
+        .where(
+            and(
+                eq(userRoles.userId, userId),
+                eq(accessRules.isActive, true)
+            )
+        )
+})
 
 /**
  * Ensures the authenticated user has the necessary permission for the specified app.
@@ -16,30 +38,20 @@ export type PermissionAction = 'read' | 'create' | 'update' | 'delete'
 export async function requirePermission(appName: string, action: PermissionAction) {
     const user = await requireUser()
 
-    // Map action to the corresponding boolean column name in the schema
-    const actionColumn = 
-        action === 'read' ? accessRules.canRead :
-        action === 'create' ? accessRules.canCreate :
-        action === 'update' ? accessRules.canUpdate :
-        accessRules.canDelete
+    const rules = await getUserAccessRules(user.id)
 
-    // Query to check if the user has AT LEAST ONE active rule that grants this permission
-    const result = await db
-        .select({ id: accessRules.id })
-        .from(accessRules)
-        .innerJoin(userRoles, eq(userRoles.roleId, accessRules.roleId))
-        .innerJoin(appTables, eq(appTables.id, accessRules.tableId))
-        .where(
-            and(
-                eq(userRoles.userId, user.id),
-                eq(appTables.tableName, appName),
-                eq(accessRules.isActive, true),
-                eq(actionColumn, true)
-            )
-        )
-        .limit(1)
+    const hasPermission = rules.some(rule => {
+        if (rule.tableName !== appName) return false
+        
+        if (action === 'read') return rule.canRead
+        if (action === 'create') return rule.canCreate
+        if (action === 'update') return rule.canUpdate
+        if (action === 'delete') return rule.canDelete
+        
+        return false
+    })
 
-    if (result.length === 0) {
+    if (!hasPermission) {
         throw new Error(`Forbidden: Missing '${action}' permission for '${appName}'`)
     }
 }
