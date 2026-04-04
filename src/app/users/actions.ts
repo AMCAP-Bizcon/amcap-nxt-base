@@ -248,12 +248,12 @@ export async function updateUserNames(updates: { id: string; displayName: string
 }
 
 /**
- * Toggles the "done" status for multiple users.
+ * Toggles the "inactive" status for multiple users.
  *
  * @param {string[]} ids - An array of User IDs to toggle
  * @throws {Error} If the user is unauthenticated
  */
-export async function toggleUsersDoneStatus(ids: string[]) {
+export async function toggleUsersInactiveStatus(ids: string[]) {
     const user = await requireUser()
     const permittedOrgIds = await getPermittedOrganizations('users', 'update')
 
@@ -280,13 +280,13 @@ export async function toggleUsersDoneStatus(ids: string[]) {
                 where: inArray(profiles.id, validIds),
                 columns: {
                     id: true,
-                    done: true
+                    inactive: true
                 }
             })
 
             const promises = currentUsers.map(user =>
                 tx.update(profiles)
-                    .set({ done: !user.done })
+                    .set({ inactive: !user.inactive })
                     .where(eq(profiles.id, user.id))
             )
 
@@ -294,7 +294,7 @@ export async function toggleUsersDoneStatus(ids: string[]) {
         })
 
         for (const id of validIds) {
-            await logChange('users', id, 'UPDATE', { action: 'toggled done status' })
+            await logChange('users', id, 'UPDATE', { action: 'toggled inactive status' })
         }
 
         revalidatePath('/users')

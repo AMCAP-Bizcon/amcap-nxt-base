@@ -5,6 +5,7 @@ import { db } from '@/db'
 import { roles, userRoles, type Role, accessRules } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
 import { requirePermission } from '@/utils/rbac'
+import { getGlobalOrgId } from '@/utils/constants'
 import { eq, inArray } from 'drizzle-orm'
 import { logChange } from '@/utils/changelogs'
 
@@ -16,7 +17,7 @@ import { logChange } from '@/utils/changelogs'
  */
 export async function createRole(name: string) {
     const user = await requireUser()
-    await requirePermission('roles', 'create')
+    await requirePermission('roles', 'create', await getGlobalOrgId())
 
     const [newRole] = await db.insert(roles).values({
         name,
@@ -39,7 +40,7 @@ export async function createRole(name: string) {
  */
 export async function updateRoleDetails(id: number, details: Partial<Pick<Role, 'name' | 'description'>>) {
     await requireUser()
-    await requirePermission('roles', 'update')
+    await requirePermission('roles', 'update', await getGlobalOrgId())
 
     if (Object.keys(details).length > 0) {
         await db
@@ -61,7 +62,7 @@ export async function updateRoleDetails(id: number, details: Partial<Pick<Role, 
  */
 export async function deleteRole(id: number) {
     await requireUser()
-    await requirePermission('roles', 'delete')
+    await requirePermission('roles', 'delete', await getGlobalOrgId())
 
     await db.delete(roles).where(eq(roles.id, id))
     await logChange('roles', id, 'DELETE', { action: 'deleted record' })
@@ -74,7 +75,7 @@ export async function deleteRole(id: number) {
  */
 export async function updateRoleSequence(updates: { id: number; sequence: number }[]) {
     await requireUser()
-    await requirePermission('roles', 'update')
+    await requirePermission('roles', 'update', await getGlobalOrgId())
 
     if (updates.length > 0) {
         await db.transaction(async (tx) => {
@@ -99,7 +100,7 @@ export async function updateRoleSequence(updates: { id: number; sequence: number
  */
 export async function updateRoleNames(updates: { id: number; name: string }[]) {
     await requireUser()
-    await requirePermission('roles', 'update')
+    await requirePermission('roles', 'update', await getGlobalOrgId())
 
     if (updates.length > 0) {
         await db.transaction(async (tx) => {
@@ -120,22 +121,22 @@ export async function updateRoleNames(updates: { id: number; name: string }[]) {
 }
 
 /**
- * Toggles the "done" status for multiple roles.
+ * Toggles the "inactive" status for multiple roles.
  */
-export async function toggleRolesDoneStatus(ids: number[]) {
+export async function toggleRolesInactiveStatus(ids: number[]) {
     await requireUser()
-    await requirePermission('roles', 'update')
+    await requirePermission('roles', 'update', await getGlobalOrgId())
 
     if (ids.length > 0) {
         await db.transaction(async (tx) => {
             const currentRoles = await tx.query.roles.findMany({
                 where: inArray(roles.id, ids),
-                columns: { id: true, done: true }
+                columns: { id: true, inactive: true }
             })
 
             const promises = currentRoles.map(role =>
                 tx.update(roles)
-                    .set({ done: !role.done })
+                    .set({ inactive: !role.inactive })
                     .where(eq(roles.id, role.id))
             )
 
@@ -143,7 +144,7 @@ export async function toggleRolesDoneStatus(ids: number[]) {
         })
 
         for (const id of ids) {
-            await logChange('roles', id, 'UPDATE', { action: 'toggled done status' })
+            await logChange('roles', id, 'UPDATE', { action: 'toggled inactive status' })
         }
 
         revalidatePath('/roles')
@@ -155,7 +156,7 @@ export async function toggleRolesDoneStatus(ids: number[]) {
  */
 export async function deleteMultipleRoles(ids: number[]) {
     await requireUser()
-    await requirePermission('roles', 'delete')
+    await requirePermission('roles', 'delete', await getGlobalOrgId())
 
     if (ids.length > 0) {
         await db.delete(roles).where(inArray(roles.id, ids));
@@ -173,7 +174,7 @@ export async function deleteMultipleRoles(ids: number[]) {
  */
 export async function updateRoleUsers(roleId: number, assignments: { userId: string, organizationId: number }[]) {
     await requireUser()
-    await requirePermission('roles', 'update')
+    await requirePermission('roles', 'update', await getGlobalOrgId())
 
     await db.transaction(async (tx) => {
         // Delete all mappings for this role
@@ -205,7 +206,7 @@ export async function updateRoleAccessRules(
     rules: { tableName: string, canRead: boolean, canCreate: boolean, canUpdate: boolean, canDelete: boolean, isActive: boolean }[]
 ) {
     await requireUser()
-    await requirePermission('roles', 'update')
+    await requirePermission('roles', 'update', await getGlobalOrgId())
 
     await db.transaction(async (tx) => {
         // Delete all mappings for this role

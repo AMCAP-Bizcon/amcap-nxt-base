@@ -8,7 +8,7 @@ import { OrganizationDetailsPanel } from './OrganizationDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
 import { type Organization, type UserOrganization, type TodoOrganization, type Profile, type Todo, type Role, type UserRole } from '@/db/schema'
 import { cn } from '@/lib/utils'
-import { createOrganization, updateOrgSequence, updateOrgNames, toggleOrgsDoneStatus, deleteMultipleOrgs } from './actions'
+import { createOrganization, updateOrgSequence, updateOrgNames, toggleOrgsInactiveStatus, deleteMultipleOrgs } from './actions'
 import { ResponsiveToolbar, ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { PlusCircle, Edit2, MoveVertical, CheckSquare, Trash2, XCircle, Save, ArrowLeft } from 'lucide-react'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
@@ -60,10 +60,10 @@ function SortableOrgItem({ id, org, isReordering, isEditing, isIdle, isCurrently
                 {isCurrentlyEditing ? (
                     <AutoResizeTextarea value={org.name} onChange={(e) => onTextChange(id, e.target.value)} className="bg-transparent border-b border-primary outline-none font-semibold text-lg px-1 -mx-1 py-0 resize-none overflow-hidden h-7" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }} />
                 ) : (
-                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${org.done ? 'line-through text-muted-foreground' : ''}`}>{org.name}</span>
+                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${org.inactive ? 'line-through text-muted-foreground' : ''}`}>{org.name}</span>
                 )}
                 {org.description && !isCurrentlyEditing && (
-                    <span className={`text-sm text-muted-foreground truncate ${org.done ? 'line-through' : ''}`}>
+                    <span className={`text-sm text-muted-foreground truncate ${org.inactive ? 'line-through' : ''}`}>
                         {org.description}
                     </span>
                 )}
@@ -101,7 +101,7 @@ export function OrganizationsList({
     const [roles, setRoles] = useState(initialRoles)
     const [userRoles, setUserRoles] = useState(initialUserRoles)
     
-    const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete' | 'reordering'>('idle')
+    const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'inactive' | 'delete' | 'reordering'>('idle')
     const [isSaving, setIsSaving] = useState(false)
     const [editingOrgId, setEditingOrgId] = useState<number | null>(null)
     const [selectedOrgIds, setSelectedOrgIds] = useState<number[]>([])
@@ -191,10 +191,10 @@ export function OrganizationsList({
                     .filter(o => { const init = initialOrganizations.find(io => io.id === o.id); return init && init.name !== o.name })
                     .map(o => ({ id: o.id, name: o.name }))
                 if (updates.length > 0) await updateOrgNames(updates)
-            } else if (mode === 'done') {
+            } else if (mode === 'inactive') {
                 if (selectedOrgIds.length > 0) {
-                    setOrgs(orgs.map(o => selectedOrgIds.includes(o.id) ? { ...o, done: !o.done } : o))
-                    await toggleOrgsDoneStatus(selectedOrgIds)
+                    setOrgs(orgs.map(o => selectedOrgIds.includes(o.id) ? { ...o, inactive: !o.inactive } : o))
+                    await toggleOrgsInactiveStatus(selectedOrgIds)
                 }
             } else if (mode === 'delete') {
                 if (selectedOrgIds.length > 0) {
@@ -241,7 +241,7 @@ export function OrganizationsList({
         creating: { gradient: 'via-violet-500/50', shadow: 'shadow-glow-violet' },
         editing: { gradient: 'via-blue-500/50', shadow: 'shadow-glow-blue' },
         reordering: { gradient: 'via-amber-500/50', shadow: 'shadow-glow-amber' },
-        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' },
+        inactive: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' },
         delete: { gradient: 'via-rose-500/50', shadow: 'shadow-glow-rose' }
     }
 
@@ -250,7 +250,7 @@ export function OrganizationsList({
             <ToolbarButton variant="outline" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<PlusCircle />} label="Create" />
             <ToolbarButton variant="outline" onClick={() => setMode('editing')} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<Edit2 />} label="Edit" />
             <ToolbarButton variant="outline" onClick={() => setMode('reordering')} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm" icon={<MoveVertical />} label="Move" />
-            <ToolbarButton variant="outline" onClick={() => setMode('done')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Complete" />
+            <ToolbarButton variant="outline" onClick={() => setMode('inactive')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Deactivate" />
             <ToolbarButton variant="outline" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm" icon={<Trash2 />} label="Remove" />
         </>
     ) : (
@@ -282,7 +282,7 @@ export function OrganizationsList({
                                 onStartEdit={setEditingOrgId}
                                 onOpenDetails={handleOpenDetails}
                                 onTextChange={handleTextChange}
-                                isSelectable={mode === 'done' || mode === 'delete'}
+                                isSelectable={mode === 'inactive' || mode === 'delete'}
                                 isSelected={selectedOrgIds.includes(org.id)}
                                 onSelectToggle={handleSelectToggle}
                                 selectedId={selectedId}

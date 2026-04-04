@@ -8,7 +8,7 @@ import { RoleDetailsPanel } from './RoleDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
 import { type Role, type UserRole, type Profile, type Organization, type AccessRule } from '@/db/schema'
 import { cn } from '@/lib/utils'
-import { createRole, updateRoleSequence, updateRoleNames, toggleRolesDoneStatus, deleteMultipleRoles } from './actions'
+import { createRole, updateRoleSequence, updateRoleNames, toggleRolesInactiveStatus, deleteMultipleRoles } from './actions'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { PlusCircle, Edit2, MoveVertical, CheckSquare, Trash2, XCircle, Save } from 'lucide-react'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
@@ -58,10 +58,10 @@ function SortableRoleItem({ id, role, isReordering, isEditing, isIdle, isCurrent
                 {isCurrentlyEditing ? (
                     <AutoResizeTextarea value={role.name} onChange={(e) => onTextChange(id, e.target.value)} className="bg-transparent border-b border-primary outline-none font-semibold text-lg px-1 -mx-1 py-0 resize-none overflow-hidden h-7" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }} />
                 ) : (
-                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${role.done ? 'line-through text-muted-foreground' : ''}`}>{role.name}</span>
+                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${role.inactive ? 'line-through text-muted-foreground' : ''}`}>{role.name}</span>
                 )}
                 {role.description && !isCurrentlyEditing && (
-                    <span className={`text-sm text-muted-foreground truncate ${role.done ? 'line-through' : ''}`}>
+                    <span className={`text-sm text-muted-foreground truncate ${role.inactive ? 'line-through' : ''}`}>
                         {role.description}
                     </span>
                 )}
@@ -95,7 +95,7 @@ export function RolesList({
     const [userRoles, setUserRoles] = useState(initialUserRoles)
     const [accessRules, setAccessRules] = useState(initialAccessRules)
     
-    const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'done' | 'delete' | 'reordering'>('idle')
+    const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'inactive' | 'delete' | 'reordering'>('idle')
     const [isSaving, setIsSaving] = useState(false)
     const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
     const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([])
@@ -183,10 +183,10 @@ export function RolesList({
                     .filter(r => { const init = initialRoles.find(ir => ir.id === r.id); return init && init.name !== r.name })
                     .map(r => ({ id: r.id, name: r.name }))
                 if (updates.length > 0) await updateRoleNames(updates)
-            } else if (mode === 'done') {
+            } else if (mode === 'inactive') {
                 if (selectedRoleIds.length > 0) {
-                    setRoles(roles.map(r => selectedRoleIds.includes(r.id) ? { ...r, done: !r.done } : r))
-                    await toggleRolesDoneStatus(selectedRoleIds)
+                    setRoles(roles.map(r => selectedRoleIds.includes(r.id) ? { ...r, inactive: !r.inactive } : r))
+                    await toggleRolesInactiveStatus(selectedRoleIds)
                 }
             } else if (mode === 'delete') {
                 if (selectedRoleIds.length > 0) {
@@ -233,7 +233,7 @@ export function RolesList({
         creating: { gradient: 'via-violet-500/50', shadow: 'shadow-glow-violet' },
         editing: { gradient: 'via-blue-500/50', shadow: 'shadow-glow-blue' },
         reordering: { gradient: 'via-amber-500/50', shadow: 'shadow-glow-amber' },
-        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' },
+        inactive: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' },
         delete: { gradient: 'via-rose-500/50', shadow: 'shadow-glow-rose' }
     }
 
@@ -242,7 +242,7 @@ export function RolesList({
             <ToolbarButton variant="outline" onClick={() => setMode('creating')} className="h-9 text-violet-600 hover:text-violet-700 hover:bg-violet-50 hover:shadow-glow-violet-sm" icon={<PlusCircle />} label="Create" />
             <ToolbarButton variant="outline" onClick={() => setMode('editing')} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<Edit2 />} label="Edit" />
             <ToolbarButton variant="outline" onClick={() => setMode('reordering')} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm" icon={<MoveVertical />} label="Move" />
-            <ToolbarButton variant="outline" onClick={() => setMode('done')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Complete" />
+            <ToolbarButton variant="outline" onClick={() => setMode('inactive')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Deactivate" />
             <ToolbarButton variant="outline" onClick={() => setMode('delete')} className="h-9 text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:shadow-glow-rose-sm" icon={<Trash2 />} label="Remove" />
         </>
     ) : (
@@ -274,7 +274,7 @@ export function RolesList({
                                 onStartEdit={setEditingRoleId}
                                 onOpenDetails={handleOpenDetails}
                                 onTextChange={handleTextChange}
-                                isSelectable={mode === 'done' || mode === 'delete'}
+                                isSelectable={mode === 'inactive' || mode === 'delete'}
                                 isSelected={selectedRoleIds.includes(role.id)}
                                 onSelectToggle={handleSelectToggle}
                                 selectedId={selectedId}

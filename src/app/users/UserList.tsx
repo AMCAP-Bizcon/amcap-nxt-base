@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { Edit2, MoveVertical, CheckSquare, XCircle, Save, ArrowLeft } from 'lucide-react'
 import { ResponsiveToolbar, ToolbarButton } from '@/components/ui/responsive-toolbar'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
-import { updateUserSequence, updateUserNames, toggleUsersDoneStatus } from './actions'
+import { updateUserSequence, updateUserNames, toggleUsersInactiveStatus } from './actions'
 import {
     DndContext,
     closestCenter,
@@ -59,10 +59,10 @@ function SortableUserItem({ id, profile, isReordering, isEditing, isIdle, isCurr
                 {isCurrentlyEditing ? (
                     <AutoResizeTextarea value={profile.displayName || ''} onChange={(e) => onTextChange(id, e.target.value)} className="bg-transparent border-b border-primary outline-none font-semibold text-lg px-1 -mx-1 py-0 resize-none overflow-hidden h-7" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }} />
                 ) : (
-                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${profile.done ? 'line-through text-muted-foreground' : ''}`}>{profile.displayName || "Unknown User"}</span>
+                    <span className={`font-semibold text-lg break-words whitespace-pre-wrap ${profile.inactive ? 'line-through text-muted-foreground' : ''}`}>{profile.displayName || "Unknown User"}</span>
                 )}
                 {!isCurrentlyEditing && (
-                    <span className={`text-sm text-muted-foreground italic truncate ${profile.done ? 'line-through' : ''}`}>
+                    <span className={`text-sm text-muted-foreground italic truncate ${profile.inactive ? 'line-through' : ''}`}>
                         {profile.email}
                     </span>
                 )}
@@ -101,7 +101,7 @@ export function UserList({
     const [userRoles, setUserRoles] = useState(initialUserRoles)
     const [detailsMode, setDetailsMode] = useState<'idle' | 'editing'>('idle')
 
-    const [mode, setMode] = useState<'idle' | 'editing' | 'done' | 'reordering'>('idle')
+    const [mode, setMode] = useState<'idle' | 'editing' | 'inactive' | 'reordering'>('idle')
     const [isSaving, setIsSaving] = useState(false)
     const [editingUserId, setEditingUserId] = useState<string | null>(null)
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
@@ -168,10 +168,10 @@ export function UserList({
                     .filter(p => { const init = initialProfiles.find(ip => ip.id === p.id); return init && init.displayName !== p.displayName })
                     .map(p => ({ id: p.id, displayName: p.displayName || '' }))
                 if (updates.length > 0) await updateUserNames(updates)
-            } else if (mode === 'done') {
+            } else if (mode === 'inactive') {
                 if (selectedUserIds.length > 0) {
-                    setProfiles(profiles.map(p => selectedUserIds.includes(p.id) ? { ...p, done: !p.done } : p))
-                    await toggleUsersDoneStatus(selectedUserIds)
+                    setProfiles(profiles.map(p => selectedUserIds.includes(p.id) ? { ...p, inactive: !p.inactive } : p))
+                    await toggleUsersInactiveStatus(selectedUserIds)
                 }
             }
             setMode('idle')
@@ -208,14 +208,14 @@ export function UserList({
         idle: { gradient: 'via-slate-400/40', shadow: 'shadow-glow-slate' },
         editing: { gradient: 'via-blue-500/50', shadow: 'shadow-glow-blue' },
         reordering: { gradient: 'via-amber-500/50', shadow: 'shadow-glow-amber' },
-        done: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' }
+        inactive: { gradient: 'via-emerald-500/50', shadow: 'shadow-glow-emerald' }
     }
 
     const listToolbarActions = mode === 'idle' ? (
         <>
             <ToolbarButton variant="outline" onClick={() => setMode('editing')} className="h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 hover:shadow-glow-blue-sm" icon={<Edit2 />} label="Edit" />
             <ToolbarButton variant="outline" onClick={() => setMode('reordering')} className="h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 hover:shadow-glow-amber-sm" icon={<MoveVertical />} label="Move" />
-            <ToolbarButton variant="outline" onClick={() => setMode('done')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Complete" />
+            <ToolbarButton variant="outline" onClick={() => setMode('inactive')} className="h-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:shadow-glow-emerald-sm" icon={<CheckSquare />} label="Deactivate" />
         </>
     ) : (
         <>
@@ -241,7 +241,7 @@ export function UserList({
                                 onStartEdit={setEditingUserId}
                                 onOpenDetails={handleOpenDetails}
                                 onTextChange={handleTextChange}
-                                isSelectable={mode === 'done'}
+                                isSelectable={mode === 'inactive'}
                                 isSelected={selectedUserIds.includes(profile.id)}
                                 onSelectToggle={handleSelectToggle}
                                 selectedId={selectedId}

@@ -5,8 +5,27 @@ import { db } from '@/db'
 import { todos, todoRelationships, todoMedia, type Todo, todoOrganizations } from '@/db/schema'
 import { requireUser, createClient } from '@/utils/supabase/server'
 import { requirePermission, getPermittedOrganizations } from '@/utils/rbac'
+import { getGlobalOrgId } from '@/utils/constants'
 import { eq, and, or, inArray, sql } from 'drizzle-orm'
 import { logChange } from '@/utils/changelogs'
+
+/**
+ * Builds a Drizzle SQL filter that matches todos belonging to any of the
+ * given organization IDs via the `todo_organizations` join table.
+ * Returns `sql\`FALSE\`` if no org IDs are provided, ensuring no rows match.
+ *
+ * @param {number[]} permittedOrgIds - Organization IDs the user has access to
+ * @returns A Drizzle SQL expression suitable for use in `.where()` or `or()` clauses
+ */
+function todoOrgFilter(permittedOrgIds: number[]) {
+    if (permittedOrgIds.length === 0) return sql`FALSE`;
+    return inArray(
+        todos.id,
+        db.select({ todoId: todoOrganizations.todoId })
+          .from(todoOrganizations)
+          .where(inArray(todoOrganizations.organizationId, permittedOrgIds))
+    );
+}
 
 /**
  * Helper function to bulk delete media files from the Supabase Storage bucket
@@ -36,7 +55,7 @@ async function deleteAssociatedMedia(supabase: any, todoIds: number[]) {
 export async function createTodo(text: string) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'create')
+    await requirePermission('todos', 'create', await getGlobalOrgId())
 
     // Find the current minimum sequence for this user's todos
     const [result] = await db
@@ -74,7 +93,7 @@ export async function createTodo(text: string) {
 export async function deleteTodo(id: number) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'delete')
+    await requirePermission('todos', 'delete', await getGlobalOrgId())
     const supabase = await createClient()
 
     // 2. Verify ownership and delete media from the storage bucket
@@ -88,12 +107,7 @@ export async function deleteTodo(id: number) {
                 eq(todos.id, id),
                 or(
                     eq(todos.userId, user.id),
-                    permittedOrgIds.length > 0 
-                        ? inArray(
-                            todos.id, 
-                            db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds))
-                        )
-                        : sql`FALSE`
+                    todoOrgFilter(permittedOrgIds)
                 )
             )
         )
@@ -120,7 +134,7 @@ export async function deleteTodo(id: number) {
 export async function updateTodoSequence(items: { id: number; sequence: number }[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update')
+    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
 
@@ -128,9 +142,7 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
     const allowedTodos = await db.select({ id: todos.id }).from(todos).where(
         or(
             eq(todos.userId, user.id),
-            permittedOrgIds.length > 0 
-                ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                : sql`FALSE`
+            todoOrgFilter(permittedOrgIds)
         )
     );
     const allowedIds = new Set(allowedTodos.map(t => t.id));
@@ -171,7 +183,7 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
 export async function updateTodoTexts(items: { id: number; text: string }[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update')
+    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
 
@@ -179,9 +191,7 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
     const allowedTodos = await db.select({ id: todos.id }).from(todos).where(
         or(
             eq(todos.userId, user.id),
-            permittedOrgIds.length > 0 
-                ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                : sql`FALSE`
+            todoOrgFilter(permittedOrgIds)
         )
     );
     const allowedIds = new Set(allowedTodos.map(t => t.id));
@@ -220,7 +230,7 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
  */
 export async function toggleTodoPin(id: number) {
     const user = await requireUser()
-    await requirePermission('todos', 'update')
+    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
 
@@ -232,9 +242,7 @@ export async function toggleTodoPin(id: number) {
                 eq(todos.id, id),
                 or(
                     eq(todos.userId, user.id),
-                    permittedOrgIds.length > 0 
-                        ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                        : sql`FALSE`
+                    todoOrgFilter(permittedOrgIds)
                 )
             )
         )
@@ -260,7 +268,7 @@ export async function toggleTodoPin(id: number) {
 export async function toggleTodosDoneStatus(ids: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update')
+    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     if (ids.length === 0) return
 
@@ -272,9 +280,7 @@ export async function toggleTodosDoneStatus(ids: number[]) {
             inArray(todos.id, ids),
             or(
                 eq(todos.userId, user.id),
-                permittedOrgIds.length > 0 
-                    ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                    : sql`FALSE`
+                todoOrgFilter(permittedOrgIds)
             )
         )
     );
@@ -305,7 +311,7 @@ export async function toggleTodosDoneStatus(ids: number[]) {
 export async function deleteMultipleTodos(ids: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'delete')
+    await requirePermission('todos', 'delete', await getGlobalOrgId())
     const supabase = await createClient()
 
     if (ids.length === 0) return
@@ -321,9 +327,7 @@ export async function deleteMultipleTodos(ids: number[]) {
                 inArray(todos.id, ids),
                 or(
                     eq(todos.userId, user.id),
-                    permittedOrgIds.length > 0 
-                        ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                        : sql`FALSE`
+                    todoOrgFilter(permittedOrgIds)
                 )
             )
         )
@@ -356,7 +360,7 @@ export async function deleteMultipleTodos(ids: number[]) {
 export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'isPinned'>> & { images?: { url: string, path: string }[], files?: { url: string, path: string }[] }) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update')
+    await requirePermission('todos', 'update', await getGlobalOrgId())
     const supabase = await createClient()
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
@@ -367,9 +371,7 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
             eq(todos.id, id),
             or(
                 eq(todos.userId, user.id),
-                permittedOrgIds.length > 0 
-                    ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                    : sql`FALSE`
+                todoOrgFilter(permittedOrgIds)
             )
         )
     )
@@ -453,7 +455,7 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
 export async function updateTodoRelationships(todoId: number, parentIds: number[], childIds: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update')
+    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     try {
         await db.transaction(async (tx) => {
@@ -465,9 +467,7 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
                     eq(todos.id, todoId),
                     or(
                         eq(todos.userId, user.id),
-                        permittedOrgIds.length > 0 
-                            ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                            : sql`FALSE`
+                        todoOrgFilter(permittedOrgIds)
                     )
                 )
             );
@@ -484,9 +484,7 @@ export async function updateTodoRelationships(todoId: number, parentIds: number[
                         inArray(todos.id, allRelatedIds),
                         or(
                             eq(todos.userId, user.id),
-                            permittedOrgIds.length > 0 
-                                ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                                : sql`FALSE`
+                            todoOrgFilter(permittedOrgIds)
                         )
                     )
                 );
@@ -601,9 +599,7 @@ export async function updateTodoOrganizations(todoId: number, organizationIds: n
             eq(todos.id, todoId),
             or(
                 eq(todos.userId, user.id),
-                permittedOrgIds.length > 0 
-                    ? inArray(todos.id, db.select({ todoId: todoOrganizations.todoId }).from(todoOrganizations).where(inArray(todoOrganizations.organizationId, permittedOrgIds)))
-                    : sql`FALSE`
+                todoOrgFilter(permittedOrgIds)
             )
         )
     );

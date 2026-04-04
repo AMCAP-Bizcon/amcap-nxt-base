@@ -5,6 +5,7 @@ import { db } from '@/db'
 import { organizations, userOrganizations, todoOrganizations, profiles, todos, type Organization, userRoles } from '@/db/schema'
 import { requireUser } from '@/utils/supabase/server'
 import { requirePermission, getPermittedOrganizations } from '@/utils/rbac'
+import { getGlobalOrgId } from '@/utils/constants'
 import { eq, inArray, or, and, sql } from 'drizzle-orm'
 import { logChange } from '@/utils/changelogs'
 
@@ -16,7 +17,7 @@ import { logChange } from '@/utils/changelogs'
  */
 export async function createOrganization(name: string) {
     const user = await requireUser()
-    await requirePermission('organizations', 'create')
+    await requirePermission('organizations', 'create', await getGlobalOrgId())
 
     const [newOrg] = await db.insert(organizations).values({
         name,
@@ -269,12 +270,12 @@ export async function updateOrgNames(updates: { id: number; name: string }[]) {
 }
 
 /**
- * Toggles the "done" status for multiple organizations.
+ * Toggles the "inactive" status for multiple organizations.
  *
  * @param {number[]} ids - An array of Organization IDs to toggle
  * @throws {Error} If the user is unauthenticated
  */
-export async function toggleOrgsDoneStatus(ids: number[]) {
+export async function toggleOrgsInactiveStatus(ids: number[]) {
     const user = await requireUser()
     const permittedOrgIds = await getPermittedOrganizations('organizations', 'update')
 
@@ -298,13 +299,13 @@ export async function toggleOrgsDoneStatus(ids: number[]) {
                 where: inArray(organizations.id, validIds),
                 columns: {
                     id: true,
-                    done: true
+                    inactive: true
                 }
             })
 
             const promises = currentOrgs.map(org =>
                 tx.update(organizations)
-                    .set({ done: !org.done })
+                    .set({ inactive: !org.inactive })
                     .where(eq(organizations.id, org.id))
             )
 
@@ -312,7 +313,7 @@ export async function toggleOrgsDoneStatus(ids: number[]) {
         })
 
         for (const id of validIds) {
-            await logChange('organizations', id, 'UPDATE', { action: 'toggled done status' })
+            await logChange('organizations', id, 'UPDATE', { action: 'toggled inactive status' })
         }
 
         revalidatePath('/organizations')
