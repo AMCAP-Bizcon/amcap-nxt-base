@@ -6,7 +6,7 @@ import { MasterDetailLayout } from '@/components/templates/MasterDetailLayout'
 import { StandardList } from '@/components/templates/StandardList'
 import { RoleDetailsPanel } from './RoleDetailsPanel'
 import { useRouter, usePathname } from 'next/navigation'
-import { type Role, type UserRole, type Profile, type Organization, type AccessRule } from '@/db/schema'
+import { type Role, type UserRole, type Profile, type Organization, type AccessRule, type RoleOrganization } from '@/db/schema'
 import { cn } from '@/lib/utils'
 import { createRole, updateRoleSequence, updateRoleNames, toggleRolesInactiveStatus, deleteMultipleRoles } from './actions'
 import { ToolbarButton } from '@/components/ui/responsive-toolbar'
@@ -37,6 +37,7 @@ export type RoleWithCreator = Role & {
 interface RolesListProps {
     initialRoles: RoleWithCreator[]
     initialUserRoles: UserRole[]
+    initialRoleOrgs: RoleOrganization[]
     initialAccessRules: AccessRule[]
     allProfiles: Profile[]
     allOrganizations: Organization[]
@@ -82,6 +83,7 @@ function SortableRoleItem({ id, role, isReordering, isEditing, isIdle, isCurrent
 export function RolesList({
     initialRoles,
     initialUserRoles,
+    initialRoleOrgs,
     initialAccessRules,
     allProfiles,
     allOrganizations,
@@ -93,6 +95,7 @@ export function RolesList({
 
     const [roles, setRoles] = useState(initialRoles)
     const [userRoles, setUserRoles] = useState(initialUserRoles)
+    const [roleOrgs, setRoleOrgs] = useState(initialRoleOrgs)
     const [accessRules, setAccessRules] = useState(initialAccessRules)
     
     const [mode, setMode] = useState<'idle' | 'creating' | 'editing' | 'inactive' | 'delete' | 'reordering'>('idle')
@@ -109,13 +112,14 @@ export function RolesList({
         if (!pendingUpdate.current) {
             setRoles(initialRoles)
             setUserRoles(initialUserRoles)
+            setRoleOrgs(initialRoleOrgs)
             setAccessRules(initialAccessRules)
         }
         if (mode === 'idle') {
             pendingUpdate.current = false
             setNewRoleName('')
         }
-    }, [initialRoles, initialUserRoles, initialAccessRules, mode])
+    }, [initialRoles, initialUserRoles, initialRoleOrgs, initialAccessRules, mode])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -295,6 +299,7 @@ export function RolesList({
         <RoleDetailsPanel
             role={roles.find(r => r.id === selectedId) || null}
             userRoles={userRoles}
+            roleOrganizations={roleOrgs}
             accessRules={accessRules}
             allProfiles={allProfiles}
             allOrganizations={allOrganizations}

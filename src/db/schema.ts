@@ -142,6 +142,18 @@ export const roles = pgTable('roles', {
 });
 
 /**
+ * Join table for Roles and Organizations
+ */
+export const roleOrganizations = pgTable('role_organizations', {
+    roleId: integer('role_id').notNull().references(() => roles.id, { onDelete: 'cascade' }),
+    organizationId: integer('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+}, (t) => [
+    primaryKey({ columns: [t.roleId, t.organizationId] })
+]);
+
+export type RoleOrganization = InferSelectModel<typeof roleOrganizations>;
+
+/**
  * Join table for Users, Roles, and Organizations
  */
 export const userRoles = pgTable('user_roles', {

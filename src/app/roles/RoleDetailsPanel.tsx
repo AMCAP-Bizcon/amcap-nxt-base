@@ -9,6 +9,7 @@ import { StandardDetailForm } from '@/components/templates/StandardDetailForm'
 import { StandardSublistTabs } from '@/components/templates/StandardSublistTabs'
 import { updateRoleDetails, deleteRole, updateRoleUsers } from './actions'
 import { RoleAssignmentsSublist, type RoleAssignmentsSublistRef, type RoleAssignment } from './RoleAssignmentsSublist'
+import { RoleOrganizationsSublist, type RoleOrganizationsSublistRef, type RoleOrganization } from './RoleOrganizationsSublist'
 import { RoleAccessRulesSublist } from './RoleAccessRulesSublist'
 import { type AccessRule } from '@/db/schema'
 import { useRouter } from 'next/navigation'
@@ -17,6 +18,7 @@ import { ChangelogViewer } from '@/components/ui/changelog-viewer'
 interface RoleDetailsPanelProps {
     role: Role | null
     userRoles: UserRole[]
+    roleOrganizations: { roleId: number, organizationId: number }[]
     accessRules: AccessRule[]
     allProfiles: Profile[]
     allOrganizations: Organization[]
@@ -32,6 +34,7 @@ interface RoleDetailsPanelProps {
 export function RoleDetailsPanel({
     role,
     userRoles,
+    roleOrganizations,
     accessRules,
     allProfiles,
     allOrganizations,
@@ -50,13 +53,15 @@ export function RoleDetailsPanel({
         name: string;
         description: string;
         assignments: RoleAssignment[];
-    }>({ name: '', description: '', assignments: [] })
+        organizations: RoleOrganization[];
+    }>({ name: '', description: '', assignments: [], organizations: [] })
 
     const [sublistBusy, setSublistBusy] = useState(false)
     const sublistMode = useRef<string>('idle')
     const currentRoleId = useRef<number | null>(null)
 
     const listRef = useRef<RoleAssignmentsSublistRef>(null)
+    const orgsListRef = useRef<RoleOrganizationsSublistRef>(null)
 
     useEffect(() => {
         if (role && role.id !== currentRoleId.current) {
@@ -65,9 +70,10 @@ export function RoleDetailsPanel({
                 name: role.name || '',
                 description: role.description || '',
                 assignments: userRoles.filter(r => r.roleId === role.id).map(r => ({ userId: r.userId, organizationId: r.organizationId })),
+                organizations: roleOrganizations.filter(r => r.roleId === role.id).map(r => ({ organizationId: r.organizationId })),
             })
         }
-    }, [role, userRoles])
+    }, [role, userRoles, roleOrganizations])
 
     const handleSublistModeChange = useCallback((mode: string) => {
         sublistMode.current = mode
@@ -87,7 +93,9 @@ export function RoleDetailsPanel({
                     name: details.name,
                     description: details.description,
                 }),
-                updateRoleUsers(role.id, details.assignments)
+                updateRoleUsers(role.id, details.assignments),
+                // Assuming we'll create an updateRoleOrganizations function
+                import('./actions').then(acts => acts.updateRoleOrganizations(role.id, details.organizations))
             ])
             onSaved()
         } catch (error: any) {
@@ -125,6 +133,7 @@ export function RoleDetailsPanel({
                 name: role.name || '',
                 description: role.description || '',
                 assignments: userRoles.filter(r => r.roleId === role.id).map(r => ({ userId: r.userId, organizationId: r.organizationId })),
+                organizations: roleOrganizations.filter(r => r.roleId === role.id).map(r => ({ organizationId: r.organizationId })),
             });
         }
         onDiscard();
@@ -211,6 +220,20 @@ export function RoleDetailsPanel({
                                     allOrganizationsMap={allOrganizationsMap}
                                     readOnly={readOnly}
                                     onAssignmentsChanged={(newAsg) => setDetails(prev => ({ ...prev, assignments: newAsg }))}
+                                    onModeChange={handleSublistModeChange}
+                                />
+                            )
+                        },
+                        {
+                            id: 'organizations',
+                            label: 'Organizations',
+                            content: (
+                                <RoleOrganizationsSublist
+                                    ref={orgsListRef}
+                                    organizations={details.organizations}
+                                    allOrganizationsMap={allOrganizationsMap}
+                                    readOnly={readOnly}
+                                    onOrganizationsChanged={(newOrgs) => setDetails(prev => ({ ...prev, organizations: newOrgs }))}
                                     onModeChange={handleSublistModeChange}
                                 />
                             )
