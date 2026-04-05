@@ -55,7 +55,6 @@ async function deleteAssociatedMedia(supabase: any, todoIds: number[]) {
 export async function createTodo(text: string) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'create', await getGlobalOrgId())
 
     // Find the current minimum sequence for this user's todos
     const [result] = await db
@@ -93,7 +92,6 @@ export async function createTodo(text: string) {
 export async function deleteTodo(id: number) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'delete', await getGlobalOrgId())
     const supabase = await createClient()
 
     // 2. Verify ownership and delete media from the storage bucket
@@ -134,7 +132,6 @@ export async function deleteTodo(id: number) {
 export async function updateTodoSequence(items: { id: number; sequence: number }[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
 
@@ -183,7 +180,6 @@ export async function updateTodoSequence(items: { id: number; sequence: number }
 export async function updateTodoTexts(items: { id: number; text: string }[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
 
@@ -230,7 +226,6 @@ export async function updateTodoTexts(items: { id: number; text: string }[]) {
  */
 export async function toggleTodoPin(id: number) {
     const user = await requireUser()
-    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
 
@@ -268,7 +263,6 @@ export async function toggleTodoPin(id: number) {
 export async function toggleTodosDoneStatus(ids: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     if (ids.length === 0) return
 
@@ -311,7 +305,6 @@ export async function toggleTodosDoneStatus(ids: number[]) {
 export async function deleteMultipleTodos(ids: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'delete', await getGlobalOrgId())
     const supabase = await createClient()
 
     if (ids.length === 0) return
@@ -360,7 +353,6 @@ export async function deleteMultipleTodos(ids: number[]) {
 export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 'text' | 'description' | 'isPinned'>> & { images?: { url: string, path: string }[], files?: { url: string, path: string }[] }) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update', await getGlobalOrgId())
     const supabase = await createClient()
 
     const permittedOrgIds = await getPermittedOrganizations('todos', 'update')
@@ -455,7 +447,6 @@ export async function updateTodoDetails(id: number, details: Partial<Pick<Todo, 
 export async function updateTodoRelationships(todoId: number, parentIds: number[], childIds: number[]) {
     // 1. Verify who is making the request
     const user = await requireUser()
-    await requirePermission('todos', 'update', await getGlobalOrgId())
 
     try {
         await db.transaction(async (tx) => {
